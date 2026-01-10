@@ -242,9 +242,9 @@ const CatalogPreview = () => {
     },
     { 
         id: 3, 
-        title: "The Pout-Pout Fish", 
+        title: "Adventures with Barefoot Critters",
         price: "Rp 95.000", 
-        image: "https://mpd-biblio-covers.imgix.net/9780374360979.jpg" 
+        image: "https://m.media-amazon.com/images/I/51kqVerYnXL._SX342_SY445_FMwebp_.jpg" 
     },
     { 
         id: 4, 

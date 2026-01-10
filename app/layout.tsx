@@ -15,6 +15,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Akinara Books & Libra",
   description: "Toko Buku Anak Jogja",
+  icons: "favicon.ico",
 };
 
 export default function RootLayout({
