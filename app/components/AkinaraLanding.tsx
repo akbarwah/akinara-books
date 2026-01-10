@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Instagram, MessageCircle, ShoppingBag, Star, Truck, Heart, Menu, X, ArrowRight, MapPin, Mail, Book, User, Globe } from 'lucide-react';
+import { Instagram, MessageCircle, ShoppingBag, Star, Truck, Heart, Menu, X, ArrowRight, MapPin, Mail, Book, User, Globe,} from 'lucide-react';
 
 // --- UTILITY COMPONENT: REVEAL ON SCROLL ---
 const Reveal = ({ children, delay = 0, className = "" }: { children: React.ReactNode, delay?: number, className?: string }) => {
@@ -305,7 +305,7 @@ const CatalogPreview = () => {
         <div className="flex flex-col items-center gap-3 mb-12">
             <Reveal>
                 <span className="inline-block px-4 py-1.5 bg-[#FF9E9E] text-white rounded-full text-sm font-bold tracking-wide shadow-sm mb-2">
-                    KOLEKSI TERBARU
+                    KOLEKSI TERBAIK
                 </span>
             </Reveal>
             <Reveal delay={200}>
@@ -399,11 +399,11 @@ const CatalogPreview = () => {
 
                     <div className="flex gap-3 mt-auto">
                          <a 
-                            href="https://shopee.co.id/akinarabooks" 
+                            href="https://wa.me/6282314336969" 
                             target="_blank"
                             className="flex-1 bg-[#8B5E3C] text-white py-3 rounded-xl font-bold text-center hover:bg-[#6D4C41] transition-colors flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
                         >
-                            <ShoppingBag className="w-5 h-5" /> Beli Sekarang
+                            <MessageCircle className="w-5 h-5" /> Order Sekarang
                         </a>
                     </div>
                 </div>
