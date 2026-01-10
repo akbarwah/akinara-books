@@ -252,6 +252,30 @@ const CatalogPreview = () => {
         price: "Rp 150.000", 
         image: "https://m.media-amazon.com/images/I/81OviQ6gLtL.jpg" 
     },
+    { 
+        id: 5, 
+        title: "365 Days", 
+        price: "Rp 280.000", 
+        image: "https://m.media-amazon.com/images/I/71wTeYgIf4L._SY466_.jpg" 
+    },
+    { 
+        id: 6, 
+        title: "Mein Kampf", 
+        price: "Rp 210.000", 
+        image: "https://blackwells.co.uk/jacket/l/9781935785071.webp" 
+    },
+    { 
+        id: 7, 
+        title: "Quantum Entanglement for Babies", 
+        price: "Rp 96.000", 
+        image: "https://m.media-amazon.com/images/I/81JJlf4IfxL._AC_UF1000,1000_QL80_.jpg" 
+    },
+    { 
+        id: 8, 
+        title: "Kama Sutra", 
+        price: "Rp 126.000", 
+        image: "https://cdn.exoticindia.com/images/products/thumbnails/t800x600/books-2019-003/baf174.jpg" 
+    },
   ];
 
   return (
