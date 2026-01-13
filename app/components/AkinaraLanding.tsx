@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Instagram, MessageCircle, ShoppingBag, Star, Truck, Heart, Menu, X, ArrowRight, MapPin, Mail, Book, User, Globe, Building2, PlayCircle, Eye, Calendar, Clock, Info, ChevronDown, ChevronUp, HelpCircle, EarthIcon } from 'lucide-react';
+import { Instagram, MessageCircle, ShoppingBag, Star, Truck, Heart, Menu, X, ArrowRight, MapPin, Mail, Book, User, Globe, Building2, PlayCircle, Eye, Calendar, Clock, Info, ChevronDown, ChevronUp, HelpCircle, EarthIcon, Bookmark, CreditCard, Package } from 'lucide-react';
 
 // --- UTILITY COMPONENT ---
 const Reveal = ({ children, delay = 0, className = "" }: { children: React.ReactNode, delay?: number, className?: string }) => {
@@ -34,32 +34,59 @@ const getEmbedUrl = (url: string) => {
     return url;
 };
 
+// --- HELPER: WA MESSAGE GENERATOR ---
+const getWaLink = (book: any) => {
+    const phone = "6282314336969";
+    let text = "";
+
+    if (book.status === 'READY') {
+        text = `Halo Admin, saya mau pesan buku *${book.title}* yang Ready Stock.`;
+    } else if (book.status === 'PO') {
+        text = `Halo Admin, saya mau ikut PO Batch ini untuk buku *${book.title}*.`;
+    } else {
+        text = `Halo Admin, saya tertarik dengan buku *${book.title}*. Apakah buku ini akan ada di Batch PO berikutnya?`;
+    }
+
+    return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
+};
+
 // --- DATA FAQ ---
 const faqData = [
     {
-        question: "Bagaimana cara memesan buku di Akinara Books?",
-        answer: "Sangat mudah! Pilih buku yang Anda inginkan di katalog, lalu klik tombol 'Beli Sekarang'. Anda akan diarahkan ke WhatsApp admin kami untuk konfirmasi stok dan total pembayaran (termasuk ongkir). Pembayaran bisa dilakukan via transfer bank."
+        question: "Apa bedanya status Ready Stock, Pre-Order, dan Referensi?",
+        answer: (
+            <>
+                <strong className="font-bold">Ready Stock</strong> berarti buku tersedia di gudang kami di Yogyakarta dan siap diproses untuk pengiriman. <strong className="font-bold">Pre-Order (PO)</strong> adalah buku yang sedang dalam masa pemesanan impor dengan estimasi waktu tunggu sekitar 4–8 minggu. <strong className="font-bold">Referensi</strong> merupakan arsip buku yang pernah kami jual, namun saat ini belum dibuka embali batch PO-nya.
+            </>
+        )
     },
     {
-        question: "Apakah semua buku di Akinara Books selalu ready stock?",
-        answer: "Tidak semua buku selalu ready stock. Kami menyediakan buku dengan status Ready Stock dan Pre-Order (PO). Setiap produk selalu dilengkapi informasi status ketersediaan, sehingga Anda dapat mengetahui apakah buku siap dikirim atau memerlukan waktu tunggu sebelum memesan."
+        question: "Bagaimana alur pemesanan dan pembayarannya?",
+        answer: (
+            <>
+                Silakan klik tombol pemesanan di katalog, Anda akan terhubung langsung ke WhatsApp Admin kami. Untuk buku <strong className="font-bold">Ready Stock</strong>, pembayaran dilakukan secara penuh. Untuk <strong className="font-bold">Pre-Order (PO)</strong>, Anda cukup membayar DP sebesar 50% di awal, dan pelunasan dilakukan saat buku sudah tiba di Indonesia.
+            </>
+        )
     },
-
+   {
+    question: "Kenapa buku impor (PO) membutuhkan waktu lama untuk sampai?",
+    answer: (
+        <>
+            Karena sebagian besar buku kami diimpor dari penerbit di Inggris, US, atau China. Proses <i className="italic">Shipping</i> (pengiriman) internasional serta pemeriksaan <i className="italic">Customs</i> (Bea Cukai) membutuhkan waktu. Kami memilih jalur yang legal dan aman agar buku sampai dalam kondisi terbaik.
+        </>
+    )
+},
     {
-        question: "Kenapa waktu Pre-Order (PO) lama sekali?",
-        answer: "Karena mayoritas buku kami diimpor langsung dari penerbit di Inggris, Amerika, atau China. Proses pengiriman internasional dan pemeriksaan bea cukai (customs) di Indonesia memakan waktu 4-8 minggu. Kami memastikan buku sampai dengan aman dan legal."
+        question: "Apakah buku Ready Stock bisa digabung ongkir dengan buku PO?",
+        answer: "Umumnya, buku Ready Stock dikirim terpisah agar si kecil bisa segera membaca buku yang tersedia. Namun, jika estimasi kedatangan buku PO sudah dekat (sekitar 1–2 minggu), Anda dapat mengajukan permintaan hold kiriman kepada Admin untuk penggabungan ongkir."
     },
     {
-        question: "Apakah pesanan PO harus langsung lunas?",
-        answer: "Tidak wajib. Untuk mengikuti PO, Anda cukup membayar Down Payment (DP) sebesar 50% diawal. Pelunasan dilakukan saat buku sudah tiba di gudang kami di Indonesia dan siap dikirim ke alamat Anda."
+        question: "Bagaimana cara agar tidak ketinggalan informasi PO buku incaran?",
+        answer: "Kami menyarankan Anda untuk bergabung ke WhatsApp Group Community Akinara. Informasi pembukaan dan penutupan PO, promo, serta koleksi buku terbaru biasanya dibagikan lebih awal melalui grup tersebut."
     },
     {
-        question: "Apakah semua buku yang dijual Original?",
-        answer: "100% Original. Kami anti buku bajakan. Kami bekerja sama langsung dengan distributor resmi dan penerbit terpercaya. Kualitas kertas, cetakan, dan keamanan bahan (untuk bayi) terjamin aman."
-    },
-    {
-        question: "Bagaimana jika buku yang saya PO ternyata kosong?",
-        answer: "Meskipun jarang, terkadang penerbit kehabisan stok mendadak. Jika ini terjadi, kami akan menginfokan segera dan uang DP Anda akan kami kembalikan (Refund) 100% tanpa potongan."
+        question: "Apakah ada garansi jika buku datang rusak?",
+        answer: "Ya, tentu. Semua buku yang kami jual adalah original. Jika terdapat cacat produksi yang signifikan atau kerusakan akibat pengiriman, silakan kirimkan video unboxing kepada Admin kami. Kami akan membantu proses retur atau pengembalian dana sesuai ketentuan."
     }
 ];
 
@@ -96,20 +123,20 @@ const booksData = [
         previewurl: "https://www.instagram.com/reel/DCEwwKPiY-H/"
     },
     { 
-        id: 3, 
-        title: "The Pout-Pout Fish", 
-        price: "Rp 95.000", 
-        type: "Hardcover",
-        age: "3-5 Thn",
-        status: "PO",
-        eta: "Maret 2026",
-        publisher: "Farrar Straus Giroux",
-        author: "Deborah Diesen",
-        pages: "32 Halaman",
-        desc: "Kisah ikan yang selalu cemberut.",
-        image: "https://mpd-biblio-covers.imgix.net/9780374360979.jpg",
-        previewurl: "https://www.instagram.com/p/DR3WbEPjJBs/" 
-    }, 
+        id: 6, 
+        title: "The Encyclopedia of Dinosaurs", 
+        price: "Rp 250.000", 
+        type: "Hardcover", 
+        age: "6+ Thn", 
+        status: "REFERENSI", 
+        eta: "Hubungi Admin",
+        publisher: "Hermes House",
+        author: "Dougal Dixon",
+        pages: "120 Halaman",
+        desc: "Ensiklopedia lengkap tentang dinosaurus dengan ilustrasi memukau.",
+        image: "https://m.media-amazon.com/images/I/81yq0v2r3sL._SL1500_.jpg",
+        previewurl: ""
+    },
     { 
         id: 4, 
         title: "Quantum Entanglement for Babies",
@@ -177,9 +204,10 @@ const POInfoBanner = () => {
     );
 };
 
-// --- COMPONENT: FAQ SECTION (BARU) ---
+// --- COMPONENT: FAQ SECTION ---
 const FAQSection = () => {
     const [openIndex, setOpenIndex] = useState<number | null>(null);
+    const waLink = "https://wa.me/6282314336969";
 
     const toggleFAQ = (index: number) => {
         setOpenIndex(openIndex === index ? null : index);
@@ -190,8 +218,7 @@ const FAQSection = () => {
             <div className="max-w-3xl mx-auto px-4">
                 <Reveal>
                     <div className="text-center mb-12">
-                        <span className="inline-block px-4 py-1.5 bg-orange-100 text-[#8B5E3C] rounded-full text-sm font-bold tracking-wide shadow-sm mb-2">FAQ</span>
-                        <h2 className="text-3xl md:text-4xl font-bold text-[#8B5E3C] mb-4">Paling Sering Ditanyakan</h2>
+                        <h2 className="text-3xl md:text-4xl font-bold text-[#8B5E3C] mb-4">Frequently Asked Questions</h2>
                         <p className="text-[#6D4C41]">Semua hal yang perlu Ayah Bunda tahu tentang pemesanan buku</p>
                     </div>
                 </Reveal>
@@ -219,6 +246,16 @@ const FAQSection = () => {
                         </Reveal>
                     ))}
                 </div>
+
+                {/* FAQ CTA (BARU) */}
+                <Reveal delay={600}>
+                    <div className="mt-12 text-center bg-[#FFF9F0] p-8 rounded-3xl border border-dashed border-orange-200">
+                        <p className="text-[#8B5E3C] font-bold mb-3 text-lg">Masih ada pertanyaan yang belum terjawab?</p>
+                        <a href={waLink} target="_blank" className="inline-flex items-center gap-2 bg-[#25D366] text-white px-6 py-3 rounded-full font-bold hover:bg-[#128C7E] transition-all shadow-md hover:shadow-lg hover:-translate-y-1">
+                            <MessageCircle className="w-5 h-5" /> Hubungi Admin via WhatsApp
+                        </a>
+                    </div>
+                </Reveal>
             </div>
         </section>
     );
@@ -263,18 +300,21 @@ const Navbar = () => {
   );
 };
 
+// --- HERO (REVISI SPACING LEBIH RAPAT) ---
 const Hero = () => {
-  const waLink = "https://wa.me/6282314336969";
   return (
-    <section className="relative pt-32 pb-16 lg:pt-48 lg:pb-32 overflow-hidden bg-[#FFF9F0]">
+    // UBAH 1: pb-16 jadi pb-8, dan lg:pb-32 jadi lg:pb-16 (Padding bawah dikurangi drastis)
+    <section className="relative pt-32 pb-8 lg:pt-48 lg:pb-16 overflow-hidden bg-[#FFF9F0]">
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#E6E6FA] rounded-full blur-[100px] opacity-60 -translate-y-1/2 translate-x-1/4 animate-pulse duration-[5000ms]"></div>
       <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-[#FFDFC4] rounded-full blur-[80px] opacity-50 translate-y-1/4 -translate-x-1/4 animate-pulse duration-[7000ms]"></div>
+      
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
         <Reveal>
             <div className="inline-block mb-6 px-4 py-1.5 bg-white border border-orange-100 rounded-full shadow-sm hover:scale-105 transition-transform cursor-default">
             <span className="text-[#8B5E3C] text-sm font-semibold">✨ Toko Buku Anak Import & Lokal Terkurasi</span>
             </div>
         </Reveal>
+        
         <Reveal delay={200}>
             <div className="relative inline-block">
                 <div className="absolute -top-6 -left-8 md:-left-12 text-[#FF9E9E] animate-pulse duration-[3000ms]">
@@ -294,18 +334,16 @@ const Hero = () => {
                 </h1>
             </div>
         </Reveal>
-<Reveal delay={400}>
-    {/* Ubah max-w-2xl menjadi max-w-4xl agar teks menyebar ke samping dan cukup dalam 2 baris */}
-    <p className="text-lg md:text-xl text-[#6D4C41] mb-10 max-w-4xl mx-auto leading-relaxed">
-        Selamat datang di <strong>Akinara Books & Library</strong>. Kami menghadirkan buku anak terkurasi untuk mendukung proses belajar, imajinasi, dan tumbuh kembang si kecil.
+        
+        <Reveal delay={400}>
+    {/* mb-0 karena button di bawah sudah dihapus */}
+    <p className="text-lg md:text-xl text-[#6D4C41] mb-0 max-w-4xl mx-auto leading-relaxed">
+        {/* REVISI COPYWRITING */}
+        Mendampingi masa emas si kecil dengan literasi berkualitas. 
+        <br className="hidden md:block" />
+        Bantu mereka mencintai membaca, belajar, dan bereksplorasi sejak dini.
     </p>
 </Reveal>
-        <Reveal delay={600}>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <a href="https://shopee.co.id/akinarabooks" target="_blank" className="w-full sm:w-auto px-8 py-4 bg-[#8B5E3C] text-white rounded-full font-bold text-lg hover:bg-[#6D4C41] shadow-lg transition-transform hover:-translate-y-1 flex items-center justify-center gap-2"><ShoppingBag className="w-5 h-5" /> Beli di Shopee</a>
-            <a href={waLink} target="_blank" className="w-full sm:w-auto px-8 py-4 bg-white text-[#8B5E3C] border-2 border-[#8B5E3C] rounded-full font-bold text-lg hover:bg-[#FFF9F0] transition-transform hover:-translate-y-1 flex items-center justify-center gap-2"><MessageCircle className="w-5 h-5" /> Chat Admin</a>
-            </div>
-        </Reveal>
       </div>
     </section>
   );
@@ -360,14 +398,19 @@ const CatalogPreview = () => {
                 <div className="aspect-[3/4] rounded-xl overflow-hidden mb-4 relative bg-gray-100">
                     <img src={book.image} alt={book.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                     
+                    {/* STATUS BADGE (3 VARIAN) */}
                     <div className="absolute top-2 right-2">
                         {book.status === 'READY' ? (
                             <span className="bg-green-500 text-white text-[10px] px-2 py-1 rounded-full font-bold shadow-md flex items-center gap-1">
                                 <Truck className="w-3 h-3" /> READY
                             </span>
-                        ) : (
+                        ) : book.status === 'PO' ? (
                             <span className="bg-blue-500 text-white text-[10px] px-2 py-1 rounded-full font-bold shadow-md flex items-center gap-1">
-                                <Clock className="w-3 h-3" /> PRE-ORDER
+                                <Clock className="w-3 h-3" /> PO
+                            </span>
+                        ) : (
+                            <span className="bg-slate-500 text-white text-[10px] px-2 py-1 rounded-full font-bold shadow-md flex items-center gap-1">
+                                <Bookmark className="w-3 h-3" /> REFERENSI
                             </span>
                         )}
                     </div>
@@ -409,10 +452,13 @@ const CatalogPreview = () => {
                 
                 <div className="w-full md:w-1/2 p-6 md:p-10 flex flex-col text-left overflow-y-auto">
                     <div className="flex gap-2 mb-3">
+                        {/* BADGE DI MODAL */}
                         {selectedBook.status === 'READY' ? (
                             <span className="inline-block px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full">READY STOCK</span>
-                        ) : (
+                        ) : selectedBook.status === 'PO' ? (
                             <span className="inline-block px-3 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded-full">PRE-ORDER</span>
+                        ) : (
+                            <span className="inline-block px-3 py-1 bg-slate-100 text-slate-700 text-xs font-bold rounded-full">KATALOG REFERENSI</span>
                         )}
                         <span className="inline-block px-3 py-1 bg-orange-100 text-[#8B5E3C] text-xs font-bold rounded-full">{selectedBook.type}</span>
                         <span className="inline-block px-3 py-1 bg-[#FF9E9E] text-white text-xs font-bold rounded-full">{selectedBook.age}</span>
@@ -421,10 +467,14 @@ const CatalogPreview = () => {
                     <h3 className="text-2xl md:text-4xl font-bold text-[#8B5E3C] mb-2 leading-tight">{selectedBook.title}</h3>
                     <p className="text-3xl font-bold text-[#FF9E9E] mb-6">{selectedBook.price}</p>
                     
+                    {/* INFO BOX STATUS */}
                     <div className="bg-slate-50 p-4 rounded-xl mb-6 text-sm text-slate-700 border border-slate-100">
                         <div className="flex justify-between mb-1">
                             <span>Status:</span>
-                            <span className="font-bold">{selectedBook.status === 'READY' ? 'Tersedia' : 'Pre-Order'}</span>
+                            <span className="font-bold">
+                                {selectedBook.status === 'READY' ? 'Tersedia' : 
+                                 selectedBook.status === 'PO' ? 'Pre-Order' : 'Belum Masuk Batch PO'}
+                            </span>
                         </div>
                         <div className="flex justify-between">
                             <span>Estimasi Tiba:</span>
@@ -447,13 +497,17 @@ const CatalogPreview = () => {
                             <div className={`relative w-full rounded-xl overflow-hidden shadow-sm border border-orange-100 ${isInstagram(selectedBook.previewurl) ? 'h-[550px]' : 'aspect-video'}`}>
                                 <iframe className="absolute inset-0 w-full h-full" src={getEmbedUrl(selectedBook.previewurl) as string} title="Review Preview" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
                             </div>
-                            <a href={selectedBook.previewurl} target="_blank" className="text-xs text-orange-400 hover:text-orange-600 mt-1 inline-block underline">Buka di aplikasi aslinya</a>
+                            <a href={selectedBook.previewurl} target="_blank" className="text-xs text-orange-400 hover:text-orange-600 mt-1 inline-block underline">Buka di aplikasi</a>
                         </div>
                     )}
 
                     <div className="flex gap-3 mt-auto pt-4">
-                         <a href="https://wa.me/6282314336969" target="_blank" className="flex-1 bg-[#8B5E3C] text-white py-3 rounded-xl font-bold text-center hover:bg-[#6D4C41] transition-colors flex items-center justify-center gap-2 shadow-md hover:shadow-lg">
-                            <MessageCircle className="w-5 h-5" /> {selectedBook.status === 'READY' ? 'Beli Sekarang' : 'Ikut PO Sekarang'}
+                         {/* TOMBOL WA DINAMIS */}
+                         <a href={getWaLink(selectedBook)} target="_blank" className={`flex-1 text-white py-3 rounded-xl font-bold text-center hover:bg-[#6D4C41] transition-colors flex items-center justify-center gap-2 shadow-md hover:shadow-lg ${selectedBook.status === 'REFERENSI' ? 'bg-slate-500 hover:bg-slate-600' : 'bg-[#8B5E3C] hover:bg-[#6D4C41]'}`}>
+                            <MessageCircle className="w-5 h-5" /> 
+                            {selectedBook.status === 'READY' ? 'Beli Sekarang' : 
+                             selectedBook.status === 'PO' ? 'Ikut PO Sekarang' : 
+                             'Tanya Jadwal PO'}
                         </a>
                     </div>
                 </div>
@@ -464,18 +518,51 @@ const CatalogPreview = () => {
   );
 };
 
+// --- COMPONENT: FOOTER (REDESAINED: 2 COLS) ---
 const Footer = () => {
   const igLink = "https://www.instagram.com/akinarabooks/";
-  const waLink = "https://wa.me/6282314336969";
   return (
     <footer className="bg-[#8B5E3C] text-[#FFF9F0] pt-16 pb-8 rounded-t-[3rem] mt-[-2rem] relative z-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mb-12">
-          <Reveal><div><h3 className="text-2xl font-bold mb-4 flex items-center gap-2"><span className="bg-[#FFF9F0] text-[#8B5E3C] px-2 py-0.5 rounded text-lg">A</span> Akinara Books</h3><p className="text-orange-100/80 leading-relaxed mb-6">Toko buku anak pilihan yang menghadirkan cerita-cerita penuh makna untuk menemani tumbuh kembang si kecil.</p><div className="flex gap-4"><a href={igLink} target="_blank" className="bg-white/10 p-2 rounded-full hover:bg-white/20 transition-colors hover:scale-110"><Instagram className="w-5 h-5" /></a><a href={waLink} target="_blank" className="bg-white/10 p-2 rounded-full hover:bg-white/20 transition-colors hover:scale-110"><MessageCircle className="w-5 h-5" /></a><a href="https://shopee.co.id" className="bg-white/10 p-2 rounded-full hover:bg-white/20 transition-colors hover:scale-110"><ShoppingBag className="w-5 h-5" /></a></div></div></Reveal>
-          <Reveal delay={200}><div><h4 className="font-bold text-lg mb-4 text-orange-200">Hubungi Kami</h4><ul className="space-y-3"><li className="flex items-start gap-3"><MapPin className="w-5 h-5 text-orange-300 mt-1 flex-shrink-0" /><span>Maguwoharjo, Yogyakarta, Indonesia</span></li><li className="flex items-center gap-3"><MessageCircle className="w-5 h-5 text-orange-300 flex-shrink-0" /><a href={waLink} target="_blank" className="hover:text-white transition-colors">+62 823-1433-6969</a></li></ul></div></Reveal>
-          <Reveal delay={400}><div><h4 className="font-bold text-lg mb-4 text-orange-200">Jam Buka</h4><div className="bg-[#6D4C41] p-4 rounded-xl border border-white/10 hover:border-orange-300 transition-colors"><div className="flex justify-between mb-2"><span>Senin - Jumat</span><span className="font-bold">09:00 - 17:00</span></div><div className="flex justify-between text-orange-200"><span>Sabtu - Minggu</span><span className="font-bold">10:00 - 15:00</span></div></div></div></Reveal>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-12">
+          
+          {/* KOLOM 1: Brand & Social */}
+          <Reveal>
+            <div>
+                <h3 className="text-2xl font-bold mb-4 flex items-center gap-2">
+                    <span className="bg-[#FFF9F0] text-[#8B5E3C] px-2 py-0.5 rounded text-lg">A</span> Akinara Books
+                </h3>
+                <p className="text-orange-100/80 leading-relaxed mb-6">
+                    Toko buku anak pilihan yang menghadirkan cerita-cerita penuh makna untuk menemani tumbuh kembang si kecil.
+                </p>
+                <div className="flex gap-4">
+                    <a href={igLink} target="_blank" className="bg-white/10 p-2 rounded-full hover:bg-white/20 transition-colors hover:scale-110">
+                        <Instagram className="w-5 h-5" />
+                    </a>
+                    <a href="https://shopee.co.id/akinarabooks" className="bg-white/10 p-2 rounded-full hover:bg-white/20 transition-colors hover:scale-110">
+                        <ShoppingBag className="w-5 h-5" />
+                    </a>
+                </div>
+            </div>
+          </Reveal>
+
+          {/* KOLOM 2: Lokasi (Rata Kanan di Desktop) */}
+          <Reveal delay={200}>
+            <div className="md:text-right">
+                <h4 className="font-bold text-lg mb-4 text-orange-200">Lokasi Kami</h4>
+                <div className="flex flex-col md:items-end gap-3 text-orange-100/90">
+                    <div className="flex items-start gap-3 md:flex-row-reverse">
+                        <MapPin className="w-5 h-5 text-orange-300 mt-1 flex-shrink-0" />
+                        <span>Maguwoharjo, Yogyakarta<br/></span>
+                    </div>
+                </div>
+            </div>
+          </Reveal>
+
         </div>
-        <div className="border-t border-white/10 pt-8 text-center text-orange-200/60 text-sm"><p>© 2026 Akinara Books & Library. Dibuat dengan ❤️ di Yogyakarta.</p></div>
+        <div className="border-t border-white/10 pt-8 text-center text-orange-200/60 text-sm">
+            <p>© 2026 Akinara Books & Library</p>
+        </div>
       </div>
     </footer>
   );
@@ -490,7 +577,7 @@ export default function AkinaraLanding() {
       <POInfoBanner />
       <Features />
       <CatalogPreview />
-      <FAQSection /> {/* FAQ DITAMBAHKAN DI SINI SEBELUM FOOTER */}
+      <FAQSection /> 
       <Footer />
     </div>
   );

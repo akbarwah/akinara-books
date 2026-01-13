@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Akinara Books & Libra",
+  title: "Akinara Books & Library",
   description: "Toko Buku Anak Jogja",
   icons: "favicon.ico",
 };
