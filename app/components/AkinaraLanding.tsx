@@ -185,7 +185,7 @@ const POInfoBanner = () => {
             </div>
 
             {showRules && (
-                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+                <div className="fixed inset-0 z-70 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
                     <div className="absolute inset-0" onClick={() => setShowRules(false)}></div>
                     <div className="relative bg-white rounded-2xl shadow-xl max-w-md w-full p-6 animate-scale-up">
                         <button onClick={() => setShowRules(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X className="w-5 h-5"/></button>
@@ -305,8 +305,8 @@ const Hero = () => {
   return (
     // UBAH 1: pb-16 jadi pb-8, dan lg:pb-32 jadi lg:pb-16 (Padding bawah dikurangi drastis)
     <section className="relative pt-32 pb-8 lg:pt-48 lg:pb-16 overflow-hidden bg-[#FFF9F0]">
-      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#E6E6FA] rounded-full blur-[100px] opacity-60 -translate-y-1/2 translate-x-1/4 animate-pulse duration-[5000ms]"></div>
-      <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-[#FFDFC4] rounded-full blur-[80px] opacity-50 translate-y-1/4 -translate-x-1/4 animate-pulse duration-[7000ms]"></div>
+      <div className="absolute top-0 right-0 w-125 h-125 bg-[#E6E6FA] rounded-full blur-[100px] opacity-60 -translate-y-1/2 translate-x-1/4 animate-pulse duration-5000"></div>
+      <div className="absolute bottom-0 left-0 w-100 h-100 bg-[#FFDFC4] rounded-full blur-[80px] opacity-50 translate-y-1/4 -translate-x-1/4 animate-pulse duration-7000"></div>
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
         <Reveal>
@@ -317,18 +317,18 @@ const Hero = () => {
         
         <Reveal delay={200}>
             <div className="relative inline-block">
-                <div className="absolute -top-6 -left-8 md:-left-12 text-[#FF9E9E] animate-pulse duration-[3000ms]">
-                    <Star className="w-8 h-8 md:w-10 md:h-10 fill-current opacity-90 rotate-[-12deg]" />
+                <div className="absolute -top-6 -left-8 md:-left-12 text-[#FF9E9E] animate-pulse duration-3000">
+                    <Star className="w-8 h-8 md:w-10 md:h-10 fill-current opacity-90 -rotate-12" />
                 </div>
-                <div className="absolute -top-2 -right-6 md:-right-10 text-yellow-400 animate-bounce duration-[4000ms] delay-700">
-                    <Star className="w-5 h-5 md:w-7 md:h-7 fill-current opacity-80 rotate-[12deg]" />
+                <div className="absolute -top-2 -right-6 md:-right-10 text-yellow-400 animate-bounce duration-4000 delay-700">
+                    <Star className="w-5 h-5 md:w-7 md:h-7 fill-current opacity-80 rotate-12" />
                 </div>
-                <div className="absolute bottom-2 -right-4 md:-right-8 text-[#9D84B7] animate-pulse duration-[5000ms] delay-200">
+                <div className="absolute bottom-2 -right-4 md:-right-8 text-[#9D84B7] animate-pulse duration-5000 delay-200">
                     <Star className="w-4 h-4 md:w-6 md:h-6 fill-current opacity-70" />
                 </div>
                 <h1 className="text-5xl md:text-7xl font-extrabold text-[#8B5E3C] mb-6 leading-tight relative z-10">
                     Buka Buku, <br />
-                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FF9E9E] to-[#9D84B7]">
+                    <span className="text-transparent bg-clip-text bg-linear-to-r from-[#FF9E9E] to-[#9D84B7]">
                         Buka Imajinasi.
                     </span>
                 </h1>
@@ -382,7 +382,7 @@ const CatalogPreview = () => {
   const isInstagram = (url: string) => url && url.includes('instagram.com');
 
   return (
-    <section className="py-20 bg-gradient-to-b from-white to-[#FFF9F0]" id="katalog">
+    <section className="py-20 bg-linear-to-b from-white to-[#FFF9F0]" id="katalog">
       <div className="max-w-7xl mx-auto px-4 text-center">
         <div className="flex flex-col items-center gap-3 mb-12">
             <Reveal><span className="inline-block px-4 py-1.5 bg-[#FF9E9E] text-white rounded-full text-sm font-bold tracking-wide shadow-sm mb-2">KOLEKSI TERBAIK</span></Reveal>
@@ -395,7 +395,7 @@ const CatalogPreview = () => {
           {booksData.map((book, idx) => (
             <Reveal key={book.id} delay={idx * 150}>
                 <div onClick={() => setSelectedBook(book)} className="group relative bg-white p-3 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-2 cursor-pointer">
-                <div className="aspect-[3/4] rounded-xl overflow-hidden mb-4 relative bg-gray-100">
+                <div className="aspect-3/4 rounded-xl overflow-hidden mb-4 relative bg-gray-100">
                     <img src={book.image} alt={book.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                     
                     {/* STATUS BADGE (3 VARIAN) */}
@@ -441,13 +441,13 @@ const CatalogPreview = () => {
 
       {/* MODAL POPUP */}
       {selectedBook && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
             <div className="absolute inset-0" onClick={closeModal}></div>
             
             <div className="relative bg-white rounded-3xl shadow-2xl max-w-6xl w-full overflow-hidden flex flex-col md:flex-row animate-scale-up max-h-[90vh]">
                 <button onClick={closeModal} className="absolute top-4 right-4 z-10 p-2 bg-white/80 rounded-full hover:bg-white text-gray-500 hover:text-red-500 transition-colors shadow-sm"><X className="w-6 h-6" /></button>
                 <div className="w-full md:w-1/2 bg-gray-50 flex items-center justify-center p-6 md:p-8">
-                    <img src={selectedBook.image} alt={selectedBook.title} className="max-w-full max-h-[300px] md:max-h-[500px] object-contain rounded-lg shadow-md" />
+                    <img src={selectedBook.image} alt={selectedBook.title} className="max-w-full max-h-75 md:max-h-125 object-contain rounded-lg shadow-md" />
                 </div>
                 
                 <div className="w-full md:w-1/2 p-6 md:p-10 flex flex-col text-left overflow-y-auto">
@@ -494,7 +494,7 @@ const CatalogPreview = () => {
                             <h4 className="font-bold text-[#8B5E3C] mb-2 flex items-center gap-2">
                                 <Eye className="w-4 h-4" /> Preview Buku
                             </h4>
-                            <div className={`relative w-full rounded-xl overflow-hidden shadow-sm border border-orange-100 ${isInstagram(selectedBook.previewurl) ? 'h-[550px]' : 'aspect-video'}`}>
+                            <div className={`relative w-full rounded-xl overflow-hidden shadow-sm border border-orange-100 ${isInstagram(selectedBook.previewurl) ? 'h-137.5' : 'aspect-video'}`}>
                                 <iframe className="absolute inset-0 w-full h-full" src={getEmbedUrl(selectedBook.previewurl) as string} title="Review Preview" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
                             </div>
                             <a href={selectedBook.previewurl} target="_blank" className="text-xs text-orange-400 hover:text-orange-600 mt-1 inline-block underline">Buka di aplikasi</a>
@@ -522,7 +522,7 @@ const CatalogPreview = () => {
 const Footer = () => {
   const igLink = "https://www.instagram.com/akinarabooks/";
   return (
-    <footer className="bg-[#8B5E3C] text-[#FFF9F0] pt-16 pb-8 rounded-t-[3rem] mt-[-2rem] relative z-20">
+    <footer className="bg-[#8B5E3C] text-[#FFF9F0] pt-16 pb-8 rounded-t-[3rem] -mt-8 relative z-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-12">
           
@@ -552,7 +552,7 @@ const Footer = () => {
                 <h4 className="font-bold text-lg mb-4 text-orange-200">Lokasi Kami</h4>
                 <div className="flex flex-col md:items-end gap-3 text-orange-100/90">
                     <div className="flex items-start gap-3 md:flex-row-reverse">
-                        <MapPin className="w-5 h-5 text-orange-300 mt-1 flex-shrink-0" />
+                        <MapPin className="w-5 h-5 text-orange-300 mt-1 shrink-0" />
                         <span>Maguwoharjo, Yogyakarta<br/></span>
                     </div>
                 </div>
