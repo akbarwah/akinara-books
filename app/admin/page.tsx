@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../../supabaseClient';
+import Papa from 'papaparse'; // IMPORT LIBRARY PAPAPARSE
 import { 
   ArrowLeft, Save, Plus, Edit, Trash2, 
   Search, BookOpen as BookOpenIcon, X, Filter, AlertCircle, CheckCircle, ChevronDown, 
@@ -113,97 +114,102 @@ export default function AdminPage() {
     router.push('/login');
   };
 
-  // --- FITUR EXPORT CSV ---
+  // --- FITUR EXPORT CSV (AMAN DENGAN PAPAPARSE) ---
   const handleExportCSV = () => {
     if (books.length === 0) {
       alert("Tidak ada data untuk diexport");
       return;
     }
 
-    // 1. Definisikan Header CSV
-    const headers = [
-      "title", "price", "author", "publisher", "category", 
-      "type", "age", "status", "pages", "eta", "previewurl", "image", "desc"
-    ];
+    // PapaParse otomatis menangani koma/enter di dalam teks
+    // Kita exclude ID agar saat di-import ulang tidak bentrok (ID dibuat otomatis oleh database)
+    const csv = Papa.unparse(books.map(({ id, ...rest }) => rest));
 
-    // 2. Convert Data ke Format CSV
-    const csvRows = books.map(book => {
-      return headers.map(header => {
-        // Ambil data, jika null ganti string kosong
-        let value = book[header as keyof Book] || ''; 
-        // Handle kolom description (desc)
-        if (header === 'desc') value = book.desc || book.description || '';
-        
-        // Escape tanda kutip (") agar format CSV tidak rusak
-        const escaped = String(value).replace(/"/g, '""'); 
-        return `"${escaped}"`; // Bungkus dengan kutip
-      }).join(",");
-    });
-
-    // 3. Gabungkan Header dan Baris
-    const csvString = [headers.join(","), ...csvRows].join("\n");
-
-    // 4. Trigger Download
-    const blob = new Blob([csvString], { type: "text/csv" });
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `katalog-akinara-${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
+    
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `katalog-akinara-backup-${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
-  // --- FITUR IMPORT CSV ---
+  // --- FITUR IMPORT CSV (AMAN DENGAN PAPAPARSE) ---
   const handleImportClick = () => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
     }
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+ // --- FITUR IMPORT CSV (VERSI TAHAN BANTING) ---
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setLoading(true);
-    const reader = new FileReader();
 
-    reader.onload = async (event) => {
-      const text = event.target?.result as string;
-      if (!text) return;
-
-      // Parsing CSV Sederhana
-      const lines = text.split("\n").map(l => l.trim()).filter(l => l);
-      const headers = lines[0].split(",").map(h => h.replace(/"/g, "").trim());
-      
-      const newBooks = lines.slice(1).map(line => {
-        // Regex untuk memisahkan koma tapi mengabaikan koma di dalam tanda kutip
-        const values = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
-        const entry: any = {};
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      // FITUR PENTING: Membersihkan Header dari karakter aneh/spasi/huruf besar
+      transformHeader: (header) => {
+        return header.trim().toLowerCase().replace(/^"|"$/g, '').replace(/[\uFEFF]/g, ""); 
+      },
+      complete: async (results) => {
+        const rawData = results.data as any[];
         
-        headers.forEach((header, index) => {
-          let val: any = values[index] ? values[index].replace(/^"|"$/g, '').replace(/""/g, '"') : '';
-          
-          if (header === 'price') val = parseInt(val) || 0;
-          entry[header] = val;
+        console.log("Header Terdeteksi:", results.meta.fields); // Cek console untuk debugging
+        console.log("Data Mentah Baris 1:", rawData[0]);
+
+        // Mapping Data dengan Penjagaan Ketat
+        const cleanData = rawData.map(row => {
+           // Helper kecil untuk ambil data meskipun key-nya agak beda dikit
+           const getVal = (key: string) => row[key] || '';
+
+           return {
+             title: getVal('title') || 'Tanpa Judul',
+             // Bersihkan harga dari Rp, titik, koma, spasi
+             price: row.price ? parseInt(String(row.price).replace(/[^0-9]/g, '')) : 0,
+             author: getVal('author'),
+             publisher: getVal('publisher'),
+             category: getVal('category') || 'Impor',
+             type: getVal('type') || 'Board Book',
+             age: getVal('age'),
+             status: getVal('status') || 'READY',
+             pages: getVal('pages'),
+             eta: getVal('eta'),
+             previewurl: getVal('previewurl'),
+             image: getVal('image'),
+             // Coba cari 'desc' atau 'description'
+             desc: getVal('desc') || getVal('description') || '',
+           };
         });
-        return entry;
-      });
 
-      if (newBooks.length > 0) {
-        // Kirim ke Supabase
-        const { error } = await supabase.from('books').insert(newBooks);
-        if (error) {
-          setMsg({ type: 'error', text: `Gagal Import: ${error.message}` });
+        // Filter baris yang benar-benar kosong (kadang excel ninggalin jejak)
+        const validData = cleanData.filter(item => item.title !== 'Tanpa Judul' || item.price > 0);
+
+        if (validData.length > 0) {
+          const { error } = await supabase.from('books').insert(validData);
+          if (error) {
+            setMsg({ type: 'error', text: `Gagal Import: ${error.message}` });
+          } else {
+            setMsg({ type: 'success', text: `Sukses import ${validData.length} buku! (ID Reset jika di-TRUNCATE)` });
+            fetchBooks();
+          }
         } else {
-          setMsg({ type: 'success', text: `Berhasil import ${newBooks.length} buku!` });
-          fetchBooks();
+            setMsg({ type: 'error', text: 'Gagal membaca data. Pastikan format CSV benar.' });
         }
+        setLoading(false);
+      },
+      error: (error) => {
+        setMsg({ type: 'error', text: `CSV Error: ${error.message}` });
+        setLoading(false);
       }
-      setLoading(false);
-      // Reset input file agar bisa upload file yang sama jika perlu
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    };
+    });
 
-    reader.readAsText(file);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
 
@@ -490,7 +496,7 @@ export default function AdminPage() {
         </div>
       </main>
 
-      {/* --- MODAL FORM (Isi sama dengan sebelumnya) --- */}
+      {/* --- MODAL FORM --- */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fade-in">
           <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col scale-up">
@@ -500,7 +506,6 @@ export default function AdminPage() {
             </div>
             <form onSubmit={handleSave} className="p-10 overflow-y-auto space-y-8">
                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {/* ... FORM FIELDS SAMA SEPERTI SEBELUMNYA ... */}
                   <div className="md:col-span-2">
                     <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2"><Tag className="w-3 h-3"/> Judul Lengkap Buku *</label>
                     <input required type="text" value={formData.title || ''} onChange={(e) => setFormData({...formData, title: e.target.value})} className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#FF9E9E] outline-none text-gray-900 font-bold text-lg" />
