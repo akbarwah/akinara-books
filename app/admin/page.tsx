@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../../supabaseClient';
-import Papa from 'papaparse'; // IMPORT LIBRARY PAPAPARSE
+import Papa from 'papaparse'; 
 import { 
   ArrowLeft, Save, Plus, Edit, Trash2, 
   Search, BookOpen as BookOpenIcon, X, Filter, AlertCircle, CheckCircle, ChevronDown, 
   SortAsc, Tag, Hash, User, Building2, Calendar, Clock, Image as ImageIcon, FileText, Youtube, Globe, LogOut,
-  Layers, Baby, BookText, RefreshCcw, Download, Upload
+  Layers, Baby, BookText, RefreshCcw, Download, Upload, Timer
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -57,8 +57,14 @@ export default function AdminPage() {
   // Ref untuk input file import
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // --- LOGIKA SATPAM ---
+  // --- KONFIGURASI AUTO LOGOUT ---
+  // 15 Menit = 15 * 60 * 1000 milidetik
+  const INACTIVITY_LIMIT = 10 * 60 * 1000; 
+
+  // --- LOGIKA SATPAM & AUTO LOGOUT ---
   useEffect(() => {
+    let inactivityTimer: NodeJS.Timeout;
+
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
@@ -66,9 +72,43 @@ export default function AdminPage() {
       } else {
         setIsChecking(false);
         fetchBooks();
+        startInactivityTimer(); // Mulai timer saat user terkonfirmasi login
       }
     };
+
+    // Fungsi Logout Otomatis
+    const handleAutoLogout = async () => {
+      // Cek apakah user masih di halaman ini (mencegah error memory leak)
+      await supabase.auth.signOut();
+      alert("Sesi Anda telah habis karena tidak ada aktivitas. Silakan login kembali.");
+      router.push('/login');
+    };
+
+    // Fungsi Reset Timer (Dipanggil tiap ada gerakan)
+    const resetTimer = () => {
+      if (inactivityTimer) clearTimeout(inactivityTimer);
+      inactivityTimer = setTimeout(handleAutoLogout, INACTIVITY_LIMIT);
+    };
+
+    // Fungsi Memasang Pendengar Gerakan (Event Listeners)
+    const startInactivityTimer = () => {
+      window.addEventListener('mousemove', resetTimer);
+      window.addEventListener('click', resetTimer);
+      window.addEventListener('keypress', resetTimer);
+      window.addEventListener('scroll', resetTimer); // Tambahan: scroll juga dihitung aktivitas
+      resetTimer(); // Set timer awal
+    };
+
     checkUser();
+
+    // Bersih-bersih saat user meninggalkan halaman (Cleanup)
+    return () => {
+      if (inactivityTimer) clearTimeout(inactivityTimer);
+      window.removeEventListener('mousemove', resetTimer);
+      window.removeEventListener('click', resetTimer);
+      window.removeEventListener('keypress', resetTimer);
+      window.removeEventListener('scroll', resetTimer);
+    };
   }, [router]);
 
   // --- STATE FILTER & SORT ---
@@ -114,20 +154,15 @@ export default function AdminPage() {
     router.push('/login');
   };
 
-  // --- FITUR EXPORT CSV (AMAN DENGAN PAPAPARSE) ---
+  // --- FITUR EXPORT CSV ---
   const handleExportCSV = () => {
     if (books.length === 0) {
       alert("Tidak ada data untuk diexport");
       return;
     }
-
-    // PapaParse otomatis menangani koma/enter di dalam teks
-    // Kita exclude ID agar saat di-import ulang tidak bentrok (ID dibuat otomatis oleh database)
     const csv = Papa.unparse(books.map(({ id, ...rest }) => rest));
-
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
-    
     const link = document.createElement("a");
     link.href = url;
     link.setAttribute("download", `katalog-akinara-backup-${new Date().toISOString().split('T')[0]}.csv`);
@@ -136,14 +171,14 @@ export default function AdminPage() {
     document.body.removeChild(link);
   };
 
-  // --- FITUR IMPORT CSV (AMAN DENGAN PAPAPARSE) ---
+  // --- FITUR IMPORT CSV ---
   const handleImportClick = () => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
     }
   };
 
- // --- FITUR IMPORT CSV (VERSI TAHAN BANTING) ---
+// --- FITUR IMPORT CSV (STRATEGI PECAH JALUR: INSERT vs UPDATE) ---
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -153,54 +188,113 @@ export default function AdminPage() {
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
-      // FITUR PENTING: Membersihkan Header dari karakter aneh/spasi/huruf besar
       transformHeader: (header) => {
         return header.trim().toLowerCase().replace(/^"|"$/g, '').replace(/[\uFEFF]/g, ""); 
       },
       complete: async (results) => {
         const rawData = results.data as any[];
-        
-        console.log("Header Terdeteksi:", results.meta.fields); // Cek console untuk debugging
-        console.log("Data Mentah Baris 1:", rawData[0]);
 
-        // Mapping Data dengan Penjagaan Ketat
+        // 1. Ambil Data Lama
+        const { data: existingBooks, error: fetchError } = await supabase
+          .from('books')
+          .select('id, title, type');
+        
+        if (fetchError) {
+          setMsg({ type: 'error', text: 'Gagal mengambil data lama.' });
+          setLoading(false);
+          return;
+        }
+
+        // 2. Buat Kamus Composite Key (Judul|Tipe)
+        const dbMap = new Map();
+        existingBooks?.forEach(b => {
+          if (b.title) {
+            const key = `${b.title.trim().toLowerCase()}|${(b.type || 'board book').trim().toLowerCase()}`;
+            dbMap.set(key, b.id);
+          }
+        });
+
+        // 3. Proses & Bersihkan Data CSV
         const cleanData = rawData.map(row => {
-           // Helper kecil untuk ambil data meskipun key-nya agak beda dikit
            const getVal = (key: string) => row[key] || '';
+           const cleanTitle = (getVal('title') || 'Tanpa Judul').trim();
+           const cleanType = (getVal('type') || 'Board Book').trim(); 
+           
+           const key = `${cleanTitle.toLowerCase()}|${cleanType.toLowerCase()}`;
+           const existingId = dbMap.get(key);
 
            return {
-             title: getVal('title') || 'Tanpa Judul',
-             // Bersihkan harga dari Rp, titik, koma, spasi
+             id: existingId, // Bisa undefined (baru) atau angka (lama)
+             title: cleanTitle,
              price: row.price ? parseInt(String(row.price).replace(/[^0-9]/g, '')) : 0,
              author: getVal('author'),
              publisher: getVal('publisher'),
              category: getVal('category') || 'Impor',
-             type: getVal('type') || 'Board Book',
+             type: cleanType,
              age: getVal('age'),
              status: getVal('status') || 'READY',
              pages: getVal('pages'),
              eta: getVal('eta'),
              previewurl: getVal('previewurl'),
              image: getVal('image'),
-             // Coba cari 'desc' atau 'description'
              desc: getVal('desc') || getVal('description') || '',
            };
         });
 
-        // Filter baris yang benar-benar kosong (kadang excel ninggalin jejak)
-        const validData = cleanData.filter(item => item.title !== 'Tanpa Judul' || item.price > 0);
+        // 4. Filter Duplikat Lokal (Ambil data paling bawah di CSV jika ada kembar)
+        const uniqueDataMap = new Map();
+        cleanData.forEach(item => {
+            if (item.title !== 'Tanpa Judul' && item.price > 0) {
+                const key = `${item.title.toLowerCase()}|${item.type.toLowerCase()}`;
+                uniqueDataMap.set(key, item);
+            }
+        });
+        const finalPayload = Array.from(uniqueDataMap.values());
 
-        if (validData.length > 0) {
-          const { error } = await supabase.from('books').insert(validData);
-          if (error) {
-            setMsg({ type: 'error', text: `Gagal Import: ${error.message}` });
-          } else {
-            setMsg({ type: 'success', text: `Sukses import ${validData.length} buku! (ID Reset jika di-TRUNCATE)` });
-            fetchBooks();
-          }
-        } else {
-            setMsg({ type: 'error', text: 'Gagal membaca data. Pastikan format CSV benar.' });
+        // 5. MEMISAHKAN ANTARA INSERT DAN UPDATE (SOLUSI INTI)
+        const toInsert: any[] = [];
+        const toUpdate: any[] = [];
+
+        finalPayload.forEach(item => {
+            if (item.id) {
+                // Punya ID -> Masuk jalur UPDATE
+                toUpdate.push(item);
+            } else {
+                // Tidak punya ID -> Masuk jalur INSERT
+                // Wajib membuang properti 'id' agar tidak error "null constraint"
+                const { id, ...itemWithoutId } = item; 
+                toInsert.push(itemWithoutId);
+            }
+        });
+
+        // 6. Eksekusi ke Database
+        let successCount = 0;
+        let errors = [];
+
+        // Jalankan Insert (Jika ada)
+        if (toInsert.length > 0) {
+            const { error: insertError } = await supabase.from('books').insert(toInsert);
+            if (insertError) errors.push(`Insert Error: ${insertError.message}`);
+            else successCount += toInsert.length;
         }
+
+        // Jalankan Update (Jika ada) - Gunakan upsert untuk update batch
+        if (toUpdate.length > 0) {
+            const { error: updateError } = await supabase.from('books').upsert(toUpdate);
+            if (updateError) errors.push(`Update Error: ${updateError.message}`);
+            else successCount += toUpdate.length;
+        }
+
+        // 7. Laporan Hasil
+        if (errors.length > 0) {
+            setMsg({ type: 'error', text: errors.join(" | ") });
+        } else if (successCount > 0) {
+            setMsg({ type: 'success', text: `Berhasil! ${toInsert.length} Baru, ${toUpdate.length} Update.` });
+            fetchBooks();
+        } else {
+            setMsg({ type: 'error', text: 'Tidak ada data valid untuk diproses.' });
+        }
+        
         setLoading(false);
       },
       error: (error) => {
@@ -211,7 +305,6 @@ export default function AdminPage() {
 
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
-
 
   const uniquePublishers = useMemo(() => ['Semua', ...Array.from(new Set(books.map(b => b.publisher).filter(Boolean))).sort()], [books]);
   const uniqueAges = useMemo(() => ['Semua', ...Array.from(new Set(books.map(b => b.age).filter(Boolean))).sort()], [books]);
@@ -361,8 +454,10 @@ export default function AdminPage() {
             <button onClick={openAddModal} className="bg-[#FF9E9E] hover:bg-[#ff8585] text-white px-6 py-2.5 rounded-full font-bold flex items-center gap-2 transition-all shadow-md active:scale-95">
               <Plus className="w-4 h-4" /> Tambah
             </button>
-            <button onClick={handleLogout} className="p-2.5 bg-white border border-orange-100 text-[#8B5E3C] hover:text-red-500 rounded-full transition-all shadow-sm">
+            <button onClick={handleLogout} className="p-2.5 bg-white border border-orange-100 text-[#8B5E3C] hover:text-red-500 rounded-full transition-all shadow-sm group relative" title="Logout">
               <LogOut className="w-5 h-5" />
+              {/* Indikator Timer */}
+              <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white" title="Auto-logout aktif"></span>
             </button>
           </div>
         </div>
@@ -506,6 +601,7 @@ export default function AdminPage() {
             </div>
             <form onSubmit={handleSave} className="p-10 overflow-y-auto space-y-8">
                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* ... (SEMUA INPUT FIELD TETAP SAMA) ... */}
                   <div className="md:col-span-2">
                     <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2"><Tag className="w-3 h-3"/> Judul Lengkap Buku *</label>
                     <input required type="text" value={formData.title || ''} onChange={(e) => setFormData({...formData, title: e.target.value})} className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#FF9E9E] outline-none text-gray-900 font-bold text-lg" />

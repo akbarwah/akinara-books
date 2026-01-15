@@ -253,7 +253,7 @@ export default function KatalogPage() {
               {/* Filter Loops */}
               {[
                   { label: "Status", val: filterStatus, set: setFilterStatus, opts: ["READY", "PO", "REFERENSI"], default: "Semua Status" },
-                  { label: "Asal Buku", val: filterCategory, set: setFilterCategory, opts: ["Impor", "Lokal"], default: "Semua Asal" },
+                  { label: "Jenis Buku", val: filterCategory, set: setFilterCategory, opts: ["Impor", "Lokal"], default: "Semua Jenis" },
                   { label: "Umur", val: filterAge, set: setFilterAge, opts: uniqueAges.filter(x => x !== 'Semua'), default: "Semua Umur" },
                   { label: "Penerbit", val: filterPublisher, set: setFilterPublisher, opts: uniquePublishers.filter(x => x !== 'Semua'), default: "Semua Penerbit" },
                   { label: "Format", val: filterType, set: setFilterType, opts: uniqueTypes.filter(x => x !== 'Semua'), default: "Semua Format" }
