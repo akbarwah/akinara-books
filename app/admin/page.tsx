@@ -6,7 +6,7 @@ import {
   ArrowLeft, Save, Plus, Edit, Trash2, 
   Search, BookOpen as BookOpenIcon, X, Filter, AlertCircle, CheckCircle, ChevronDown, 
   SortAsc, Tag, Hash, User, Building2, Calendar, Clock, Image as ImageIcon, FileText, Youtube, Globe, LogOut,
-  Layers, Baby, BookText, RefreshCcw
+  Layers, Baby, BookText, RefreshCcw, Download, Upload
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -52,6 +52,9 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [msg, setMsg] = useState({ type: '', text: '' });
+  
+  // Ref untuk input file import
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // --- LOGIKA SATPAM ---
   useEffect(() => {
@@ -109,6 +112,100 @@ export default function AdminPage() {
     await supabase.auth.signOut();
     router.push('/login');
   };
+
+  // --- FITUR EXPORT CSV ---
+  const handleExportCSV = () => {
+    if (books.length === 0) {
+      alert("Tidak ada data untuk diexport");
+      return;
+    }
+
+    // 1. Definisikan Header CSV
+    const headers = [
+      "title", "price", "author", "publisher", "category", 
+      "type", "age", "status", "pages", "eta", "previewurl", "image", "desc"
+    ];
+
+    // 2. Convert Data ke Format CSV
+    const csvRows = books.map(book => {
+      return headers.map(header => {
+        // Ambil data, jika null ganti string kosong
+        let value = book[header as keyof Book] || ''; 
+        // Handle kolom description (desc)
+        if (header === 'desc') value = book.desc || book.description || '';
+        
+        // Escape tanda kutip (") agar format CSV tidak rusak
+        const escaped = String(value).replace(/"/g, '""'); 
+        return `"${escaped}"`; // Bungkus dengan kutip
+      }).join(",");
+    });
+
+    // 3. Gabungkan Header dan Baris
+    const csvString = [headers.join(","), ...csvRows].join("\n");
+
+    // 4. Trigger Download
+    const blob = new Blob([csvString], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `katalog-akinara-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+  };
+
+  // --- FITUR IMPORT CSV ---
+  const handleImportClick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setLoading(true);
+    const reader = new FileReader();
+
+    reader.onload = async (event) => {
+      const text = event.target?.result as string;
+      if (!text) return;
+
+      // Parsing CSV Sederhana
+      const lines = text.split("\n").map(l => l.trim()).filter(l => l);
+      const headers = lines[0].split(",").map(h => h.replace(/"/g, "").trim());
+      
+      const newBooks = lines.slice(1).map(line => {
+        // Regex untuk memisahkan koma tapi mengabaikan koma di dalam tanda kutip
+        const values = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
+        const entry: any = {};
+        
+        headers.forEach((header, index) => {
+          let val: any = values[index] ? values[index].replace(/^"|"$/g, '').replace(/""/g, '"') : '';
+          
+          if (header === 'price') val = parseInt(val) || 0;
+          entry[header] = val;
+        });
+        return entry;
+      });
+
+      if (newBooks.length > 0) {
+        // Kirim ke Supabase
+        const { error } = await supabase.from('books').insert(newBooks);
+        if (error) {
+          setMsg({ type: 'error', text: `Gagal Import: ${error.message}` });
+        } else {
+          setMsg({ type: 'success', text: `Berhasil import ${newBooks.length} buku!` });
+          fetchBooks();
+        }
+      }
+      setLoading(false);
+      // Reset input file agar bisa upload file yang sama jika perlu
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    };
+
+    reader.readAsText(file);
+  };
+
 
   const uniquePublishers = useMemo(() => ['Semua', ...Array.from(new Set(books.map(b => b.publisher).filter(Boolean))).sort()], [books]);
   const uniqueAges = useMemo(() => ['Semua', ...Array.from(new Set(books.map(b => b.age).filter(Boolean))).sort()], [books]);
@@ -215,6 +312,15 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-[#FFF9F0] text-[#6D4C41] font-sans pb-20 overflow-x-hidden text-sm">
       
+      {/* INPUT FILE TERSEMBUNYI UNTUK IMPORT */}
+      <input 
+        type="file" 
+        accept=".csv" 
+        ref={fileInputRef} 
+        onChange={handleFileChange} 
+        className="hidden" 
+      />
+
       {/* --- NAVBAR --- */}
       <header className="bg-[#FFF9F0]/90 backdrop-blur-md border-b border-orange-100 sticky top-0 z-40 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
@@ -227,6 +333,25 @@ export default function AdminPage() {
             </h1>
           </div>
           <div className="flex items-center gap-3">
+            
+            {/* BUTTON IMPORT */}
+            <button 
+              onClick={handleImportClick}
+              title="Import CSV"
+              className="p-2.5 bg-white border border-green-200 text-green-600 hover:bg-green-50 rounded-full transition-all shadow-sm"
+            >
+              <Upload className="w-5 h-5" />
+            </button>
+
+            {/* BUTTON EXPORT */}
+            <button 
+              onClick={handleExportCSV}
+              title="Export CSV"
+              className="p-2.5 bg-white border border-blue-200 text-blue-600 hover:bg-blue-50 rounded-full transition-all shadow-sm"
+            >
+              <Download className="w-5 h-5" />
+            </button>
+
             <button onClick={openAddModal} className="bg-[#FF9E9E] hover:bg-[#ff8585] text-white px-6 py-2.5 rounded-full font-bold flex items-center gap-2 transition-all shadow-md active:scale-95">
               <Plus className="w-4 h-4" /> Tambah
             </button>
@@ -239,11 +364,18 @@ export default function AdminPage() {
 
       <main className="max-w-[96%] mx-auto py-8">
         
+        {/* Notifikasi Message */}
+        {msg.text && (
+          <div className={`mb-6 p-4 rounded-2xl flex items-center gap-3 font-bold text-sm animate-fade-in ${msg.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+            {msg.type === 'success' ? <CheckCircle className="w-5 h-5"/> : <AlertCircle className="w-5 h-5"/>}
+            {msg.text}
+          </div>
+        )}
+
         {/* --- FILTER SECTION --- */}
         <Reveal>
           <section className="bg-white p-6 rounded-[2.5rem] border border-orange-100 shadow-sm mb-10">
             <div className="flex flex-col xl:flex-row gap-4 items-center">
-              
               <div className="flex-1 w-full flex gap-3">
                 <div className="relative flex-1">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-300" />
@@ -358,7 +490,7 @@ export default function AdminPage() {
         </div>
       </main>
 
-      {/* --- MODAL FORM --- */}
+      {/* --- MODAL FORM (Isi sama dengan sebelumnya) --- */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fade-in">
           <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col scale-up">
@@ -368,6 +500,7 @@ export default function AdminPage() {
             </div>
             <form onSubmit={handleSave} className="p-10 overflow-y-auto space-y-8">
                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* ... FORM FIELDS SAMA SEPERTI SEBELUMNYA ... */}
                   <div className="md:col-span-2">
                     <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2"><Tag className="w-3 h-3"/> Judul Lengkap Buku *</label>
                     <input required type="text" value={formData.title || ''} onChange={(e) => setFormData({...formData, title: e.target.value})} className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#FF9E9E] outline-none text-gray-900 font-bold text-lg" />
@@ -406,23 +539,18 @@ export default function AdminPage() {
                     <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2"><Baby className="w-3 h-3"/> Rekomendasi Usia</label>
                     <input type="text" value={formData.age || ''} onChange={(e) => setFormData({...formData, age: e.target.value})} className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#FF9E9E] outline-none text-gray-900 font-bold" placeholder="Misal: 3-5 Tahun" />
                   </div>
-
-                  {/* FIELD BARU: PREVIEW URL (OPSIONAL) */}
                   <div>
                     <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2"><Youtube className="w-3 h-3"/> Preview URL (Video)</label>
                     <input type="text" value={formData.previewurl || ''} onChange={(e) => setFormData({...formData, previewurl: e.target.value})} className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#FF9E9E] outline-none text-gray-900 font-bold" placeholder="Link YouTube/Instagram" />
                   </div>
-                  
                   <div>
                     <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2"><Calendar className="w-3 h-3"/> Estimasi Kedatangan (ETA)</label>
                     <input type="text" value={formData.eta || ''} onChange={(e) => setFormData({...formData, eta: e.target.value})} className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#FF9E9E] outline-none text-gray-900 font-bold" />
                   </div>
-
                   <div className="md:col-span-2">
                     <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2"><ImageIcon className="w-3 h-3"/> Link Cover Gambar Utama *</label>
                     <input required type="text" value={formData.image || ''} onChange={(e) => setFormData({...formData, image: e.target.value})} className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#FF9E9E] outline-none text-gray-900 font-bold" placeholder="https://..." />
                   </div>
-
                   <div className="md:col-span-3">
                     <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2"><Globe className="w-3 h-3"/> Deskripsi Lengkap / Sinopsis</label>
                     <textarea rows={4} value={formData.description || ''} onChange={(e) => setFormData({...formData, description: e.target.value})} className="w-full px-6 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#FF9E9E] outline-none text-gray-900 font-bold leading-relaxed" />
