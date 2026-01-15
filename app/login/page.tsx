@@ -3,8 +3,8 @@
 import React, { useState } from 'react';
 import { supabase } from '../../supabaseClient'; 
 import { useRouter } from 'next/navigation';
-import { Lock, Mail, ArrowRight, BookOpen } from 'lucide-react';
-import Link from 'next/link'; // <--- Baris ini yang tadi ketinggalan
+import { Lock, Mail, ArrowRight } from 'lucide-react';
+import Link from 'next/link';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -25,8 +25,6 @@ export default function LoginPage() {
       });
 
       if (error) throw error;
-
-      // Jika sukses, lempar ke dashboard admin
       router.push('/admin');
     } catch (err: any) {
       setErrorMsg(err.message || 'Gagal login. Periksa email & password.');
@@ -37,32 +35,35 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-[#FFF9F0] flex items-center justify-center p-4 font-sans">
-      <div className="bg-white p-8 md:p-12 rounded-[2rem] shadow-2xl border border-orange-100 w-full max-w-md animate-fade-in">
+      <div className="bg-white p-8 md:p-12 rounded-[3rem] shadow-2xl border border-orange-100 w-full max-w-md animate-fade-in text-center">
         
-        {/* Logo & Header */}
-        <div className="text-center mb-10">
-          <div className="bg-orange-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 shadow-inner">
-            <BookOpen className="text-[#FF9E9E] w-10 h-10" />
-          </div>
+        {/* --- LOGO AKINARA --- */}
+        <div className="mb-6">
+          <img 
+            src="/logo-akinara.png" // <--- GANTI dengan nama file logo kamu di folder public
+            alt="Logo Akinara" 
+            className="w-32 h-auto mx-auto object-contain drop-shadow-sm"
+            // Jika logo kamu belum muncul, pastikan filenya ada di folder /public/logo.png
+          />
+        </div>
+
+        <div className="mb-10">
           <h1 className="text-3xl font-black text-[#8B5E3C] tracking-tighter">
-            AKINARA<span className="text-[#FF9E9E]">ADMIN</span>
+            Admin Dashboard
           </h1>
-          <p className="text-[10px] font-bold text-orange-300 uppercase tracking-[0.2em] mt-2">
-            Pintu Masuk Terbatas
-          </p>
         </div>
 
         {/* Error Alert */}
         {errorMsg && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl text-red-600 text-xs font-bold flex items-center gap-2">
+          <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl text-red-600 text-xs font-bold flex items-center gap-2 justify-center">
             <Lock className="w-4 h-4" />
             {errorMsg}
           </div>
         )}
 
-        <form onSubmit={handleLogin} className="space-y-6">
+        <form onSubmit={handleLogin} className="space-y-6 text-left">
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-[#8B5E3C] uppercase ml-1 tracking-widest">Email</label>
+            <label className="text-[10px] font-black text-[#8B5E3C] uppercase ml-1 tracking-widest">Email Admin</label>
             <div className="relative">
               <Mail className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-orange-200" />
               <input 
@@ -94,7 +95,7 @@ export default function LoginPage() {
           <button 
             disabled={loading} 
             type="submit" 
-            className="w-full bg-[#8B5E3C] hover:bg-[#6D4C41] text-white py-5 rounded-2xl font-black text-lg shadow-xl flex items-center justify-center gap-3 transition-all active:scale-95 disabled:bg-gray-200"
+            className="w-full bg-[#8B5E3C] hover:bg-[#6D4C41] text-white py-5 rounded-[2rem] font-black text-lg shadow-xl flex items-center justify-center gap-3 transition-all active:scale-95 disabled:bg-gray-200"
           >
             {loading ? (
               <div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -104,10 +105,9 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="mt-10 text-center">
-          {/* Komponen Link ini yang tadi menyebabkan error */}
+        <div className="mt-10">
           <Link href="/katalog" className="text-[10px] font-bold text-orange-300 hover:text-[#8B5E3C] uppercase tracking-widest transition-colors">
-            ← Kembali ke Katalog Publik
+            ← Kembali ke Katalog
           </Link>
         </div>
       </div>

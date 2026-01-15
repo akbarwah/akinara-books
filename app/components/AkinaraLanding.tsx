@@ -154,56 +154,138 @@ const booksData = [
     },
 ];
 
-// --- COMPONENT: PO INFO BANNER ---
+// --- COMPONENT: PO INFO BANNER (SLIM VERSION) ---
 const POInfoBanner = () => {
     const [showRules, setShowRules] = useState(false);
+    const [daysLeft, setDaysLeft] = useState(0);
+
+    useEffect(() => {
+        const targetDate = new Date('2026-01-30T23:59:59').getTime();
+        const now = new Date().getTime();
+        const difference = targetDate - now;
+        const days = Math.ceil(difference / (1000 * 60 * 60 * 24));
+        setDaysLeft(days > 0 ? days : 0);
+    }, []);
+
+    const waLink = "https://wa.me/6282314336969?text=Halo%20Akinara%21%20Saya%20ingin%20tanya%20dan%20pesan%20buku%20PO%20Flying%20Eye%20Books...";
 
     return (
-        <div className="bg-[#FFF9F0] py-8 border-b border-orange-100">
+        <div className="bg-[#FFF9F0] py-6 border-b border-orange-100 font-sans">
             <div className="max-w-4xl mx-auto px-4">
-                <Reveal>
-                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-orange-200 flex flex-col md:flex-row items-center justify-between gap-6">
-                        <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                                <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                                <span className="text-xs font-bold text-orange-500 uppercase tracking-wider">Ongoing Batch</span>
+                <div className="bg-white rounded-[1.8rem] p-6 md:p-7 shadow-sm border border-orange-200 flex flex-col md:flex-row items-center justify-between gap-5 relative overflow-hidden">
+                    
+                    <div className="flex-1 relative z-10 text-center md:text-left">
+                        <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
+                            <span className="flex items-center gap-1 px-2.5 py-0.5 bg-green-50 text-green-600 rounded-full text-[9px] font-black uppercase tracking-wider border border-green-100">
+                                <span className="w-1 h-1 rounded-full bg-green-500 animate-pulse"></span>
+                                Ongoing Batch
+                            </span>
+                            {daysLeft > 0 && (
+                                <span className="flex items-center gap-1 px-2.5 py-0.5 bg-red-50 text-red-500 rounded-full text-[9px] font-black uppercase tracking-wider border border-red-100">
+                                    <Clock className="w-2.5 h-2.5"/> {daysLeft} Hari Lagi
+                                </span>
+                            )}
+                        </div>
+
+                        <h3 className="text-2xl md:text-2xl font-black text-[#8B5E3C] leading-tight tracking-tighter">
+                            Open PO: <span className="text-[#FF9E9E]">Flying Eye Books Publisher</span>
+                        </h3>
+                        
+                        {/* Jarak mt-3 agar lebih rapat */}
+                        <div className="mt-3 flex flex-wrap justify-center md:justify-start gap-4 text-[13px] text-[#6D4C41] font-bold">
+                            <div className="flex items-center gap-2">
+                                <Calendar className="w-4 h-4 text-orange-400"/> 
+                                <span>Tutup: <strong className="text-[#8B5E3C]">30 Jan</strong></span>
                             </div>
-                            <h3 className="text-2xl font-bold text-[#8B5E3C]">Open PO: Batch Januari 2026</h3>
-                            <div className="mt-3 flex flex-wrap gap-4 text-sm text-[#6D4C41]">
-                                <div className="flex items-center gap-1.5"><Calendar className="w-4 h-4 text-orange-400"/> Tutup: <strong>30 Jan</strong></div>
-                                <div className="flex items-center gap-1.5"><Truck className="w-4 h-4 text-orange-400"/> ETA Indo: <strong>Akhir Feb</strong></div>
+                            <div className="flex items-center gap-2">
+                                <Truck className="w-4 h-4 text-orange-400"/> 
+                                <span>ETA Indo: <strong className="text-[#8B5E3C]">Akhir Feb</strong></span>
                             </div>
                         </div>
-                        <button 
-                            onClick={() => setShowRules(true)}
-                            className="px-6 py-3 bg-orange-100 text-orange-700 rounded-xl font-bold text-sm hover:bg-orange-200 transition-colors flex items-center gap-2"
-                        >
-                            <Info className="w-4 h-4" /> Cara & Aturan PO
-                        </button>
                     </div>
-                </Reveal>
+                    
+                    <button 
+                        onClick={() => setShowRules(true)}
+                        className="w-full md:w-auto px-6 py-3.5 bg-[#8B5E3C] text-white rounded-2xl font-black text-xs hover:bg-[#6D4C41] transition-all flex items-center justify-center gap-2 shadow-md active:scale-95"
+                    >
+                        <Info className="w-4 h-4" /> CARA ORDER
+                    </button>
+                </div>
             </div>
 
+{/* Modal Detail & Cara Order */}
             {showRules && (
-                <div className="fixed inset-0 z-70 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[#8B5E3C]/20 backdrop-blur-md animate-fade-in text-sm">
                     <div className="absolute inset-0" onClick={() => setShowRules(false)}></div>
-                    <div className="relative bg-white rounded-2xl shadow-xl max-w-md w-full p-6 animate-scale-up">
-                        <button onClick={() => setShowRules(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X className="w-5 h-5"/></button>
-                        <h3 className="text-xl font-bold text-[#8B5E3C] mb-4">Aturan Pre-Order</h3>
-                        <ul className="space-y-3 text-sm text-slate-600 list-disc pl-5">
-                            <li>Sistem PO memerlukan DP 50% diawal.</li>
-                            <li>Estimasi kedatangan (ETA) adalah perkiraan, bisa lebih cepat atau lambat karena bea cukai.</li>
-                            <li>Pelunasan dilakukan saat buku tiba di Indonesia.</li>
-                            <li>Jika buku *Out of Stock* dari penerbit, uang DP kembali 100%.</li>
-                        </ul>
-                        <button onClick={() => setShowRules(false)} className="w-full mt-6 py-2.5 bg-[#8B5E3C] text-white rounded-xl font-bold">Mengerti</button>
+                    <div className="relative bg-white rounded-[3rem] shadow-2xl max-w-xl w-full p-8 md:p-12 animate-scale-up max-h-[90vh] overflow-y-auto">
+                        
+                        <button onClick={() => setShowRules(false)} className="absolute top-8 right-8 text-gray-300 hover:text-red-500 transition-colors">
+                            <X className="w-6 h-6"/>
+                        </button>
+                        
+                        <div className="text-center mb-10">
+                            <h3 className="text-2xl font-black text-[#8B5E3C] uppercase tracking-tighter">Order Journey</h3>
+                            <p className="text-orange-400 font-bold text-xs uppercase tracking-widest mt-1">Langkah mudah pesan buku impianmu</p>
+                        </div>
+                        
+                        {/* ALUR ORDER STEPS */}
+                        <div className="space-y-8 relative before:absolute before:left-[15px] before:top-2 before:bottom-2 before:w-0.5 before:bg-orange-100">
+                            <div className="relative pl-12">
+                                <span className="absolute left-0 top-0 w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center text-[#8B5E3C] font-black text-xs z-10 border-4 border-white shadow-sm">1</span>
+                                <p className="font-black text-[#8B5E3C] text-base">Pilih Buku & Chat Admin</p>
+                                <p className="text-slate-500 leading-relaxed mt-1">Pilih koleksi Flying Eye Books di katalog ini, lalu klik tombol WhatsApp untuk bertanya.</p>
+                            </div>
+                            
+                            <div className="relative pl-12">
+                                <span className="absolute left-0 top-0 w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center text-[#8B5E3C] font-black text-xs z-10 border-4 border-white shadow-sm">2</span>
+                                <p className="font-black text-[#8B5E3C] text-base">Konfirmasi Pesanan</p>
+                                <p className="text-slate-500 leading-relaxed mt-1">Admin akan mengecek ketersediaan buku dan memberikan detail estimasi waktu tiba (ETA).</p>
+                            </div>
+
+                            <div className="relative pl-12">
+                                <span className="absolute left-0 top-0 w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center text-white font-black text-xs z-10 border-4 border-white shadow-sm animate-pulse">3</span>
+                                <p className="font-black text-orange-600 text-base">Submit & DP 50%</p>
+                                <p className="text-slate-600 font-bold leading-relaxed mt-1 bg-orange-50 p-3 rounded-xl border border-orange-100">
+                                    Pembayaran DP dilakukan SETELAH kami men-submit orderan ke penerbit untuk memastikan slot bukumu aman.
+                                </p>
+                            </div>
+
+                            <div className="relative pl-12">
+                                <span className="absolute left-0 top-0 w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center text-[#8B5E3C] font-black text-xs z-10 border-4 border-white shadow-sm">4</span>
+                                <p className="font-black text-[#8B5E3C] text-base">Buku Tiba & Pelunasan</p>
+                                <p className="text-slate-500 leading-relaxed mt-1">Saat buku mendarat di gudang Akinara Jogja, admin akan mengirimkan invoice pelunasan.</p>
+                            </div>
+
+                            <div className="relative pl-12">
+                                <span className="absolute left-0 top-0 w-8 h-8 bg-[#FF9E9E] rounded-full flex items-center justify-center text-white font-black text-xs z-10 border-4 border-white shadow-sm">5</span>
+                                <p className="font-black text-[#8B5E3C] text-base">Siap Meluncur ke Rumah!</p>
+                                <p className="text-slate-500 leading-relaxed mt-1 font-medium">Buku dikemas dengan rapi dan aman untuk dikirim ke alamatmu.</p>
+                            </div>
+                        </div>
+
+                        {/* TOMBOL WA LANGSUNG */}
+                        <div className="mt-12 space-y-4">
+                            <a 
+                                href={waLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-full py-5 bg-[#25D366] hover:bg-[#1ebd5a] text-white rounded-2xl font-black text-lg shadow-lg flex items-center justify-center gap-3 transition-all active:scale-95"
+                            >
+                                <MessageCircle className="w-6 h-6" /> CHAT ADMIN VIA WA
+                            </a>
+                            <button 
+                                onClick={() => setShowRules(false)}
+                                className="w-full py-4 text-slate-400 font-bold uppercase tracking-widest text-[10px] hover:text-[#8B5E3C] transition-colors"
+                            >
+                                Tutup Panduan
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
         </div>
     );
 };
-
 // --- COMPONENT: FAQ SECTION ---
 const FAQSection = () => {
     const [openIndex, setOpenIndex] = useState<number | null>(null);
