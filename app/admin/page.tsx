@@ -253,7 +253,6 @@ export default function AdminPage() {
                     className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-[#F8F9FA] border-none focus:ring-2 focus:ring-orange-100 outline-none text-[#6D4C41] font-bold transition-all"
                   />
                 </div>
-                {/* TOMBOL RESET FILTER */}
                 <button 
                   onClick={handleResetFilter}
                   title="Reset Filter"
@@ -407,14 +406,23 @@ export default function AdminPage() {
                     <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2"><Baby className="w-3 h-3"/> Rekomendasi Usia</label>
                     <input type="text" value={formData.age || ''} onChange={(e) => setFormData({...formData, age: e.target.value})} className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#FF9E9E] outline-none text-gray-900 font-bold" placeholder="Misal: 3-5 Tahun" />
                   </div>
+
+                  {/* FIELD BARU: PREVIEW URL (OPSIONAL) */}
                   <div>
-                    <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2"><Calendar className="w-3 h-3"/> Kapan Estimasi Kedatangan? (ETA)</label>
+                    <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2"><Youtube className="w-3 h-3"/> Preview URL (Video)</label>
+                    <input type="text" value={formData.previewurl || ''} onChange={(e) => setFormData({...formData, previewurl: e.target.value})} className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#FF9E9E] outline-none text-gray-900 font-bold" placeholder="Link YouTube/Instagram" />
+                  </div>
+                  
+                  <div>
+                    <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2"><Calendar className="w-3 h-3"/> Estimasi Kedatangan (ETA)</label>
                     <input type="text" value={formData.eta || ''} onChange={(e) => setFormData({...formData, eta: e.target.value})} className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#FF9E9E] outline-none text-gray-900 font-bold" />
                   </div>
+
                   <div className="md:col-span-2">
                     <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2"><ImageIcon className="w-3 h-3"/> Link Cover Gambar Utama *</label>
                     <input required type="text" value={formData.image || ''} onChange={(e) => setFormData({...formData, image: e.target.value})} className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#FF9E9E] outline-none text-gray-900 font-bold" placeholder="https://..." />
                   </div>
+
                   <div className="md:col-span-3">
                     <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2"><Globe className="w-3 h-3"/> Deskripsi Lengkap / Sinopsis</label>
                     <textarea rows={4} value={formData.description || ''} onChange={(e) => setFormData({...formData, description: e.target.value})} className="w-full px-6 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#FF9E9E] outline-none text-gray-900 font-bold leading-relaxed" />
