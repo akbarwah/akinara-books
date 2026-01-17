@@ -7,7 +7,7 @@ import {
   ArrowLeft, Save, Plus, Edit, Trash2, 
   Search, BookOpen as BookOpenIcon, X, Filter, AlertCircle, CheckCircle, ChevronDown, 
   SortAsc, Tag, Hash, User, Building2, Calendar, Clock, Image as ImageIcon, FileText, Youtube, Globe, LogOut,
-  Layers, Baby, BookText, RefreshCcw, Download, Upload, Timer
+  Layers, Baby, BookText, RefreshCcw, Download, Upload, Timer, Star, Sticker
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -43,7 +43,12 @@ type Book = {
   image: string;
   eta: string;
   previewurl: string;
+  is_highlight?: boolean; 
+  sticker_text?: string; 
 };
+
+// --- PILIHAN STICKER ---
+const STICKER_OPTIONS = ["NEW", "HOT", "SALE", "BEST SELLER", "COMING SOON"];
 
 // --- 3. KOMPONEN UTAMA ---
 export default function AdminPage() {
@@ -54,54 +59,59 @@ export default function AdminPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [msg, setMsg] = useState({ type: '', text: '' });
   
-  // Ref untuk input file import
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // --- KONFIGURASI AUTO LOGOUT ---
-  // 15 Menit = 15 * 60 * 1000 milidetik
   const INACTIVITY_LIMIT = 10 * 60 * 1000; 
 
   // --- LOGIKA SATPAM & AUTO LOGOUT ---
   useEffect(() => {
     let inactivityTimer: NodeJS.Timeout;
 
-    const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        router.push('/login');
-      } else {
-        setIsChecking(false);
-        fetchBooks();
-        startInactivityTimer(); // Mulai timer saat user terkonfirmasi login
-      }
-    };
-
-    // Fungsi Logout Otomatis
-    const handleAutoLogout = async () => {
-      // Cek apakah user masih di halaman ini (mencegah error memory leak)
+    const performLogout = async (reason: string) => {
       await supabase.auth.signOut();
-      alert("Sesi Anda telah habis karena tidak ada aktivitas. Silakan login kembali.");
+      localStorage.removeItem('admin_last_active'); 
+      alert(reason);
       router.push('/login');
     };
 
-    // Fungsi Reset Timer (Dipanggil tiap ada gerakan)
-    const resetTimer = () => {
-      if (inactivityTimer) clearTimeout(inactivityTimer);
-      inactivityTimer = setTimeout(handleAutoLogout, INACTIVITY_LIMIT);
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        router.push('/login');
+      } else {
+        const lastActive = localStorage.getItem('admin_last_active');
+        const now = Date.now();
+
+        if (lastActive && (now - parseInt(lastActive) > INACTIVITY_LIMIT)) {
+           await performLogout("Sesi Anda telah berakhir karena tidak ada aktivitas (Timeout). Silakan login kembali.");
+           return; 
+        }
+
+        localStorage.setItem('admin_last_active', now.toString());
+        setIsChecking(false);
+        fetchBooks();
+        startInactivityTimer(); 
+      }
     };
 
-    // Fungsi Memasang Pendengar Gerakan (Event Listeners)
+    const resetTimer = () => {
+      if (inactivityTimer) clearTimeout(inactivityTimer);
+      localStorage.setItem('admin_last_active', Date.now().toString());
+      inactivityTimer = setTimeout(() => {
+        performLogout("Sesi Anda telah habis. Silakan login kembali.");
+      }, INACTIVITY_LIMIT);
+    };
+
     const startInactivityTimer = () => {
       window.addEventListener('mousemove', resetTimer);
       window.addEventListener('click', resetTimer);
       window.addEventListener('keypress', resetTimer);
-      window.addEventListener('scroll', resetTimer); // Tambahan: scroll juga dihitung aktivitas
-      resetTimer(); // Set timer awal
+      window.addEventListener('scroll', resetTimer);
+      resetTimer(); 
     };
 
     checkUser();
 
-    // Bersih-bersih saat user meninggalkan halaman (Cleanup)
     return () => {
       if (inactivityTimer) clearTimeout(inactivityTimer);
       window.removeEventListener('mousemove', resetTimer);
@@ -120,7 +130,6 @@ export default function AdminPage() {
   const [filterType, setFilterType] = useState('Semua');
   const [sortBy, setSortBy] = useState('terbaru'); 
 
-  // --- FUNGSI RESET FILTER ---
   const handleResetFilter = () => {
     setSearchQuery('');
     setFilterStatus('Semua');
@@ -135,7 +144,9 @@ export default function AdminPage() {
   const initialForm: Book = {
     title: '', price: '', type: 'Board Book', age: '0-2 Thn',
     status: 'READY', category: 'Impor', publisher: '', author: '',
-    pages: '', description: '', image: '', eta: 'Siap Kirim', previewurl: ''
+    pages: '', description: '', image: '', eta: 'Siap Kirim', previewurl: '',
+    is_highlight: false,
+    sticker_text: '', 
   };
   const [formData, setFormData] = useState<Book>(initialForm);
   const [isEditing, setIsEditing] = useState(false);
@@ -151,6 +162,7 @@ export default function AdminPage() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    localStorage.removeItem('admin_last_active'); 
     router.push('/login');
   };
 
@@ -178,7 +190,6 @@ export default function AdminPage() {
     }
   };
 
-// --- FITUR IMPORT CSV (STRATEGI PECAH JALUR: INSERT vs UPDATE) ---
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -194,7 +205,6 @@ export default function AdminPage() {
       complete: async (results) => {
         const rawData = results.data as any[];
 
-        // 1. Ambil Data Lama
         const { data: existingBooks, error: fetchError } = await supabase
           .from('books')
           .select('id, title, type');
@@ -205,7 +215,6 @@ export default function AdminPage() {
           return;
         }
 
-        // 2. Buat Kamus Composite Key (Judul|Tipe)
         const dbMap = new Map();
         existingBooks?.forEach(b => {
           if (b.title) {
@@ -214,17 +223,15 @@ export default function AdminPage() {
           }
         });
 
-        // 3. Proses & Bersihkan Data CSV
         const cleanData = rawData.map(row => {
            const getVal = (key: string) => row[key] || '';
            const cleanTitle = (getVal('title') || 'Tanpa Judul').trim();
            const cleanType = (getVal('type') || 'Board Book').trim(); 
-           
            const key = `${cleanTitle.toLowerCase()}|${cleanType.toLowerCase()}`;
            const existingId = dbMap.get(key);
 
            return {
-             id: existingId, // Bisa undefined (baru) atau angka (lama)
+             id: existingId, 
              title: cleanTitle,
              price: row.price ? parseInt(String(row.price).replace(/[^0-9]/g, '')) : 0,
              author: getVal('author'),
@@ -238,10 +245,11 @@ export default function AdminPage() {
              previewurl: getVal('previewurl'),
              image: getVal('image'),
              desc: getVal('desc') || getVal('description') || '',
+             is_highlight: false,
+             sticker_text: getVal('sticker_text') || getVal('sticker') || '', 
            };
         });
 
-        // 4. Filter Duplikat Lokal (Ambil data paling bawah di CSV jika ada kembar)
         const uniqueDataMap = new Map();
         cleanData.forEach(item => {
             if (item.title !== 'Tanpa Judul' && item.price > 0) {
@@ -251,41 +259,33 @@ export default function AdminPage() {
         });
         const finalPayload = Array.from(uniqueDataMap.values());
 
-        // 5. MEMISAHKAN ANTARA INSERT DAN UPDATE (SOLUSI INTI)
         const toInsert: any[] = [];
         const toUpdate: any[] = [];
 
         finalPayload.forEach(item => {
             if (item.id) {
-                // Punya ID -> Masuk jalur UPDATE
                 toUpdate.push(item);
             } else {
-                // Tidak punya ID -> Masuk jalur INSERT
-                // Wajib membuang properti 'id' agar tidak error "null constraint"
                 const { id, ...itemWithoutId } = item; 
                 toInsert.push(itemWithoutId);
             }
         });
 
-        // 6. Eksekusi ke Database
         let successCount = 0;
         let errors = [];
 
-        // Jalankan Insert (Jika ada)
         if (toInsert.length > 0) {
             const { error: insertError } = await supabase.from('books').insert(toInsert);
             if (insertError) errors.push(`Insert Error: ${insertError.message}`);
             else successCount += toInsert.length;
         }
 
-        // Jalankan Update (Jika ada) - Gunakan upsert untuk update batch
         if (toUpdate.length > 0) {
             const { error: updateError } = await supabase.from('books').upsert(toUpdate);
             if (updateError) errors.push(`Update Error: ${updateError.message}`);
             else successCount += toUpdate.length;
         }
 
-        // 7. Laporan Hasil
         if (errors.length > 0) {
             setMsg({ type: 'error', text: errors.join(" | ") });
         } else if (successCount > 0) {
@@ -305,6 +305,7 @@ export default function AdminPage() {
 
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
+
 
   const uniquePublishers = useMemo(() => ['Semua', ...Array.from(new Set(books.map(b => b.publisher).filter(Boolean))).sort()], [books]);
   const uniqueAges = useMemo(() => ['Semua', ...Array.from(new Set(books.map(b => b.age).filter(Boolean))).sort()], [books]);
@@ -343,6 +344,8 @@ export default function AdminPage() {
       eta: book.eta ?? '',
       previewurl: book.previewurl ?? '',
       description: book.desc ?? book.description ?? '', 
+      is_highlight: book.is_highlight ?? false, 
+      sticker_text: book.sticker_text ?? '', 
     });
     setIsEditing(true);
     setIsModalOpen(true);
@@ -372,6 +375,8 @@ export default function AdminPage() {
         eta: formData.eta || '',
         previewurl: formData.previewurl || '',
         desc: formData.description || '', 
+        is_highlight: formData.is_highlight || false,
+        sticker_text: formData.sticker_text || '', 
       };
 
       let response;
@@ -456,7 +461,6 @@ export default function AdminPage() {
             </button>
             <button onClick={handleLogout} className="p-2.5 bg-white border border-orange-100 text-[#8B5E3C] hover:text-red-500 rounded-full transition-all shadow-sm group relative" title="Logout">
               <LogOut className="w-5 h-5" />
-              {/* Indikator Timer */}
               <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white" title="Auto-logout aktif"></span>
             </button>
           </div>
@@ -465,7 +469,6 @@ export default function AdminPage() {
 
       <main className="max-w-[96%] mx-auto py-8">
         
-        {/* Notifikasi Message */}
         {msg.text && (
           <div className={`mb-6 p-4 rounded-2xl flex items-center gap-3 font-bold text-sm animate-fade-in ${msg.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
             {msg.type === 'success' ? <CheckCircle className="w-5 h-5"/> : <AlertCircle className="w-5 h-5"/>}
@@ -550,9 +553,21 @@ export default function AdminPage() {
                     <td className="px-6 py-4 text-xs font-bold text-gray-300 text-center">#{book.id}</td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-5">
-                        <img src={book.image} className="w-14 h-20 object-cover rounded-xl shadow-md bg-gray-100" />
+                        <div className="relative">
+                            <img src={book.image} className="w-14 h-20 object-cover rounded-xl shadow-md bg-gray-100" />
+                            {/* INDIKATOR STICKER DI ADMIN LIST */}
+                            {book.sticker_text && (
+                                <div className="absolute -top-2 -right-2 w-5 h-5 bg-pink-500 rounded-full flex items-center justify-center text-[8px] text-white font-bold shadow-sm z-10 border border-white">
+                                    <Sticker className="w-3 h-3"/>
+                                </div>
+                            )}
+                        </div>
                         <div className="space-y-2">
-                          <div className="font-black text-gray-800 text-base leading-tight">{book.title}</div>
+                          <div className="flex items-center gap-2">
+                             <div className="font-black text-gray-800 text-base leading-tight">{book.title}</div>
+                             {book.is_highlight && <span className="bg-yellow-100 text-yellow-600 text-[9px] px-1.5 py-0.5 rounded font-bold border border-yellow-200"><Star className="w-2.5 h-2.5 inline"/> Featured</span>}
+                          </div>
+                          
                           <div className="text-[10px] text-orange-400 font-black uppercase tracking-widest flex items-center gap-2">
                              <User className="w-3 h-3"/> {book.author || 'No Author'}
                           </div>
@@ -601,7 +616,7 @@ export default function AdminPage() {
             </div>
             <form onSubmit={handleSave} className="p-10 overflow-y-auto space-y-8">
                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {/* ... (SEMUA INPUT FIELD TETAP SAMA) ... */}
+                  {/* --- INPUT FIELDS --- */}
                   <div className="md:col-span-2">
                     <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2"><Tag className="w-3 h-3"/> Judul Lengkap Buku *</label>
                     <input required type="text" value={formData.title || ''} onChange={(e) => setFormData({...formData, title: e.target.value})} className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#FF9E9E] outline-none text-gray-900 font-bold text-lg" />
@@ -656,6 +671,49 @@ export default function AdminPage() {
                     <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2"><Globe className="w-3 h-3"/> Deskripsi Lengkap / Sinopsis</label>
                     <textarea rows={4} value={formData.description || ''} onChange={(e) => setFormData({...formData, description: e.target.value})} className="w-full px-6 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#FF9E9E] outline-none text-gray-900 font-bold leading-relaxed" />
                   </div>
+
+                  {/* --- FITUR TAMBAHAN: HIGHLIGHT & STICKER (DROPDOWN) --- */}
+                  <div className="md:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Checkbox Highlight */}
+                      <div className="bg-orange-50 p-4 rounded-2xl border border-orange-100 flex items-center gap-4 hover:bg-orange-100 transition-colors">
+                        <input 
+                            type="checkbox" 
+                            id="isHighlight"
+                            checked={formData.is_highlight || false} 
+                            onChange={(e) => setFormData({...formData, is_highlight: e.target.checked})} 
+                            className="w-6 h-6 text-[#8B5E3C] rounded focus:ring-orange-500 border-gray-300 cursor-pointer accent-[#8B5E3C]" 
+                        />
+                        <label htmlFor="isHighlight" className="cursor-pointer">
+                            <span className="flex items-center gap-2 font-black text-[#8B5E3C] uppercase text-xs tracking-widest">
+                                <Star className="w-4 h-4 fill-yellow-400 text-yellow-600" />
+                                Highlight di Homepage?
+                            </span>
+                            <span className="text-xs text-gray-500 font-medium mt-1 block">
+                                Jika dicentang, buku ini akan muncul di 'Mini Katalog' halaman utama. (Sebaiknya maksimal 4 buku).
+                            </span>
+                        </label>
+                      </div>
+
+                      {/* Dropdown Sticker */}
+                      <div className="bg-pink-50 p-4 rounded-2xl border border-pink-100 hover:bg-pink-100 transition-colors">
+                        <label className="flex items-center gap-2 font-black text-[#8B5E3C] uppercase text-xs tracking-widest mb-2">
+                            <Sticker className="w-4 h-4 text-pink-500" />
+                            Sticker Label (Pojok Kanan)
+                        </label>
+                        <select 
+                            value={formData.sticker_text || ''} 
+                            onChange={(e) => setFormData({...formData, sticker_text: e.target.value})} 
+                            className="w-full px-3 py-2 rounded-lg border border-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-300 bg-white text-sm font-bold text-[#8B5E3C]"
+                        >
+                            <option value="">Tanpa Sticker</option>
+                            {STICKER_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                        </select>
+                        <span className="text-[10px] text-gray-500 mt-1 block">
+                            Pilih label sticker yang ingin ditampilkan. Otomatis menyesuaikan warna dan bentuk.
+                        </span>
+                      </div>
+                  </div>
+
                </div>
                <div className="flex gap-4 pt-6">
                 <button type="submit" disabled={loading} className="flex-1 bg-[#8B5E3C] hover:bg-[#6D4C41] text-white py-5 rounded-2xl font-black text-lg shadow-xl disabled:bg-gray-200 transition-all active:scale-95">

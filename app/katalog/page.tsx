@@ -6,11 +6,12 @@ import {
   X, Search, Filter, Truck, Clock, Bookmark, 
   MessageCircle, Eye, User, Building2, Book as BookIcon, Globe, 
   ChevronDown, ArrowLeft, ShoppingBag, 
-  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Layers // Import icon baru
+  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Layers, ArrowRight, Baby, BookText, Edit, Trash2, Tag, Hash, Image as ImageIcon,
+  Star, Flame, Zap
 } from 'lucide-react';
 import Link from 'next/link';
 
-// --- 1. UTILITY COMPONENT ---
+// --- UTILITY COMPONENT ---
 const Reveal = ({ children, delay = 0, className = "" }: { children: React.ReactNode, delay?: number, className?: string }) => {
   const [isVisible, setIsVisible] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -24,7 +25,12 @@ const Reveal = ({ children, delay = 0, className = "" }: { children: React.React
   return <div ref={ref} className={`transition-all duration-1000 ease-out transform ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'} ${className}`} style={{ transitionDelay: `${delay}ms` }}>{children}</div>;
 };
 
-// --- 2. HELPER FUNCTIONS ---
+// --- HELPER FUNCTIONS ---
+const isEmbeddable = (url: string) => {
+    if (!url) return false;
+    return url.includes('youtube.com') || url.includes('youtu.be') || url.includes('instagram.com');
+};
+
 const getEmbedUrl = (url: string) => {
     if (!url) return null;
     if (url.includes('youtube.com') || url.includes('youtu.be')) {
@@ -56,7 +62,81 @@ const getWaLink = (book: any) => {
     return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
 };
 
-// --- 3. DEFINISI TIPE DATA ---
+// --- KOMPONEN: PREMIUM STICKER BADGE (SAMA PERSIS DENGAN MAIN PAGE) ---
+const StickerBadge = ({ type }: { type: string }) => {
+    if (!type) return null;
+
+    switch (type) {
+        case 'BEST SELLER':
+            return (
+                <div className="absolute -top-4 -right-4 z-30 flex flex-col items-center group-hover:scale-110 transition-transform duration-300 origin-top">
+                    <div className="relative flex flex-col items-center animate-bounce-slow">
+                        <div className="w-14 h-14 rounded-full bg-gradient-to-br from-yellow-300 via-yellow-500 to-yellow-600 shadow-xl border-2 border-white flex flex-col items-center justify-center text-center z-10">
+                            <span className="text-[8px] font-black text-yellow-900 leading-none">BEST</span>
+                            <span className="text-[8px] font-black text-white leading-none mt-0.5 drop-shadow-md">SELLER</span>
+                            <Star className="w-3 h-3 text-white fill-white mt-0.5 absolute -top-1 right-0 animate-pulse" />
+                        </div>
+                        <div className="absolute -bottom-3 z-0 flex gap-1">
+                            <div className="w-3 h-5 bg-yellow-600 transform skew-y-[20deg] rounded-b-sm"></div>
+                            <div className="w-3 h-5 bg-yellow-600 transform -skew-y-[20deg] rounded-b-sm"></div>
+                        </div>
+                    </div>
+                </div>
+            );
+
+        case 'SALE':
+            return (
+                <div className="absolute -top-3 -right-2 z-30 group-hover:rotate-12 transition-transform duration-500 origin-top-right">
+                    <div className="relative animate-swing">
+                        <div className="w-12 h-16 bg-red-600 rounded-b-lg shadow-lg border-2 border-white flex flex-col items-center justify-center relative">
+                            <div className="w-2 h-2 bg-gray-800 rounded-full absolute top-2 left-1/2 -translate-x-1/2 border border-white/20"></div>
+                            <span className="text-white font-black text-[10px] -rotate-90 tracking-widest mt-2">SALE</span>
+                        </div>
+                    </div>
+                </div>
+            );
+
+        case 'NEW':
+            return (
+                <div className="absolute -top-5 -right-5 z-30 group-hover:rotate-180 transition-transform duration-700">
+                    <div className="relative w-16 h-16 flex items-center justify-center">
+                        <svg viewBox="0 0 100 100" className="w-full h-full text-green-400 drop-shadow-lg animate-pulse-slow">
+                            <path fill="currentColor" d="M50 0L61 35L98 35L68 57L79 91L50 70L21 91L32 57L2 35L39 35Z" />
+                        </svg>
+                        <span className="absolute text-green-900 font-black text-[10px] transform -rotate-12">NEW!</span>
+                    </div>
+                </div>
+            );
+
+        case 'HOT':
+            return (
+                <div className="absolute -top-3 -right-3 z-30 group-hover:scale-110 transition-transform duration-300">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-orange-500 to-red-600 border-2 border-white shadow-lg flex flex-col items-center justify-center animate-wiggle">
+                        <Flame className="w-4 h-4 text-yellow-200 fill-yellow-200" />
+                        <span className="text-white font-black text-[9px] italic pr-1">HOT</span>
+                    </div>
+                </div>
+            );
+
+        case 'COMING SOON':
+            return (
+                <div className="absolute -top-3 -right-3 z-30 group-hover:-translate-y-1 transition-transform duration-300">
+                    <div className="bg-blue-600 text-white px-3 py-1.5 rounded-full border-2 border-white shadow-lg flex items-center gap-1.5 animate-float">
+                        <Clock className="w-3 h-3 text-blue-200" /> 
+                        <div className="flex flex-col items-start leading-none">
+                            <span className="text-[7px] font-bold text-blue-200 uppercase">Coming</span>
+                            <span className="text-[8px] font-black uppercase">Soon</span>
+                        </div>
+                    </div>
+                </div>
+            );
+
+        default:
+            return null;
+    }
+};
+
+// --- TIPE DATA ---
 type Book = {
   id: number;
   title: string;
@@ -73,6 +153,7 @@ type Book = {
   desc?: string;       
   previewurl: string;
   eta?: string;
+  sticker_text?: string;
 };
 
 type BookGroup = {
@@ -80,16 +161,14 @@ type BookGroup = {
     books: Book[]; 
 }
 
-// --- 4. KOMPONEN UTAMA ---
+// --- KOMPONEN UTAMA ---
 export default function KatalogPage() {
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // State Modal Grouping
   const [selectedGroup, setSelectedGroup] = useState<BookGroup | null>(null);
   const [activeVariant, setActiveVariant] = useState<Book | null>(null);
 
-  // State Filter
   const [filterSearch, setFilterSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('Semua'); 
   const [filterCategory, setFilterCategory] = useState('Semua'); 
@@ -97,14 +176,10 @@ export default function KatalogPage() {
   const [filterType, setFilterType] = useState('Semua');
   const [filterPublisher, setFilterPublisher] = useState('Semua');
 
-  // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12; 
-
-  // Ref untuk Auto Scroll
   const topRef = useRef<HTMLDivElement>(null);
 
-  // Fetch Data
   useEffect(() => {
     async function fetchBooks() {
       setLoading(true);
@@ -120,12 +195,10 @@ export default function KatalogPage() {
     fetchBooks();
   }, []);
 
-  // Reset page saat filter berubah
   useEffect(() => {
     setCurrentPage(1);
   }, [filterSearch, filterStatus, filterCategory, filterAge, filterType, filterPublisher]);
 
-  // Saat grup dipilih, otomatis pilih varian pertama (prioritas READY)
   useEffect(() => {
     if (selectedGroup && selectedGroup.books.length > 0) {
         const readyVariant = selectedGroup.books.find(b => b.status === 'READY');
@@ -133,12 +206,10 @@ export default function KatalogPage() {
     }
   }, [selectedGroup]);
 
-  // --- LOGIC FILTER OTOMATIS ---
   const uniquePublishers = useMemo(() => ['Semua', ...Array.from(new Set(books.map(b => b.publisher).filter(Boolean))).sort()], [books]);
   const uniqueAges = useMemo(() => ['Semua', ...Array.from(new Set(books.map(b => b.age).filter(Boolean))).sort()], [books]);
   const uniqueTypes = useMemo(() => ['Semua', ...Array.from(new Set(books.map(b => b.type).filter(Boolean))).sort()], [books]);
 
-  // --- LOGIC GROUPING & FILTER ---
   const processedBooks = useMemo(() => {
     const filtered = books.filter(book => {
         const matchSearch = book.title.toLowerCase().includes(filterSearch.toLowerCase()) || 
@@ -169,15 +240,11 @@ export default function KatalogPage() {
 
   }, [books, filterSearch, filterStatus, filterCategory, filterAge, filterType, filterPublisher]);
 
-  // --- PAGINATION LOGIC (LIMIT 10 PAGES BLOCK) ---
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentGroups = processedBooks.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(processedBooks.length / itemsPerPage);
 
-  // Logic untuk menampilkan nomor halaman (Block 10 halaman)
-  // Jika page 1-10 -> tampil 1...10
-  // Jika page 11 -> tampil 11...20
   const maxPageButtons = 10;
   const startPage = Math.floor((currentPage - 1) / maxPageButtons) * maxPageButtons + 1;
   const endPage = Math.min(startPage + maxPageButtons - 1, totalPages);
@@ -187,10 +254,8 @@ export default function KatalogPage() {
     pageNumbers.push(i);
   }
 
-  // Fungsi Ganti Halaman + Auto Scroll
   const paginate = (pageNumber: number) => {
     setCurrentPage(pageNumber);
-    // Scroll halus ke bagian atas grid buku
     if (topRef.current) {
         topRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } else {
@@ -229,7 +294,6 @@ export default function KatalogPage() {
         </Reveal>
 
         {/* --- FILTER BAR --- */}
-        {/* Tambahkan ref di sini agar scroll kembali ke filter/atas grid */}
         <div ref={topRef} className="scroll-mt-24"></div> 
         <Reveal delay={100}>
           <div className="bg-white p-6 rounded-3xl shadow-sm border border-orange-100 mb-10">
@@ -317,6 +381,11 @@ export default function KatalogPage() {
                         onClick={() => setSelectedGroup(group)} 
                         className="group relative bg-white p-3 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-2 cursor-pointer border border-transparent hover:border-orange-100 h-full flex flex-col"
                     >
+                        {/* --- STIKER LABEL --- */}
+                        {displayBook.sticker_text && (
+                            <StickerBadge type={displayBook.sticker_text} />
+                        )}
+
                         {/* Image Container */}
                         <div className="aspect-[3/4] rounded-xl overflow-hidden mb-4 relative bg-gray-100">
                             <img 
@@ -522,17 +591,45 @@ export default function KatalogPage() {
                             <span className="leading-relaxed">{activeVariant.description || activeVariant.desc || "Belum ada deskripsi."}</span>
                         </div>
                     </div>
+
+                    {/* --- SMART LINK PREVIEW (UPDATED) --- */}
                     {activeVariant.previewurl && (
                         <div className="mb-6">
                             <h4 className="font-bold text-[#8B5E3C] mb-2 flex items-center gap-2">
                                 <Eye className="w-4 h-4" /> Preview Buku
                             </h4>
-                            <div className={`relative w-full rounded-xl overflow-hidden shadow-sm border border-orange-100 ${activeVariant.previewurl.includes('instagram') ? 'h-[550px]' : 'aspect-video'}`}>
-                                <iframe className="absolute inset-0 w-full h-full" src={getEmbedUrl(activeVariant.previewurl) as string} title="Review Preview" allowFullScreen></iframe>
-                            </div>
-                            <a href={activeVariant.previewurl} target="_blank" className="text-xs text-orange-400 hover:text-orange-600 mt-1 inline-block underline">Buka di aplikasi</a>
+                            
+                            {/* LOGIKA PINTAR: Cek apakah link aman di-embed? */}
+                            {isEmbeddable(activeVariant.previewurl) ? (
+                                <>
+                                    <div className={`relative w-full rounded-xl overflow-hidden shadow-sm border border-orange-100 ${activeVariant.previewurl.includes('instagram') ? 'h-[550px]' : 'aspect-video'}`}>
+                                        <iframe className="absolute inset-0 w-full h-full" src={getEmbedUrl(activeVariant.previewurl) as string} title="Review Preview" allowFullScreen></iframe>
+                                    </div>
+                                    <a href={activeVariant.previewurl} target="_blank" className="text-xs text-orange-400 hover:text-orange-600 mt-1 inline-block underline">Buka di aplikasi</a>
+                                </>
+                            ) : (
+                                // JIKA AMAZON / WEBSITE LAIN -> TAMPILKAN TOMBOL FALLBACK
+                                <a 
+                                    href={activeVariant.previewurl} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="flex items-center justify-between p-4 bg-orange-50 hover:bg-orange-100 border border-orange-200 rounded-xl transition-all group"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-white p-2 rounded-lg shadow-sm">
+                                            <BookIcon className="w-6 h-6 text-[#8B5E3C]" />
+                                        </div>
+                                        <div>
+                                            <p className="font-bold text-[#8B5E3C] text-sm">Lihat Isi Buku (Look Inside)</p>
+                                            <p className="text-xs text-orange-400">Preview tersedia di website eksternal</p>
+                                        </div>
+                                    </div>
+                                    <ArrowRight className="w-5 h-5 text-[#8B5E3C] transform group-hover:translate-x-1 transition-transform" />
+                                </a>
+                            )}
                         </div>
                     )}
+                    
                     <div className="flex gap-3 mt-auto pt-4">
                          <a href={getWaLink(activeVariant)} target="_blank" className={`flex-1 text-white py-3 rounded-xl font-bold text-center hover:bg-[#6D4C41] transition-colors flex items-center justify-center gap-2 shadow-md hover:shadow-lg ${activeVariant.status === 'REFERENSI' ? 'bg-slate-500 hover:bg-slate-600' : 'bg-[#8B5E3C] hover:bg-[#6D4C41]'}`}>
                             <MessageCircle className="w-5 h-5" /> 
