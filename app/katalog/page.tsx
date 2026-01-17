@@ -6,8 +6,8 @@ import {
   X, Search, Filter, Truck, Clock, Bookmark, 
   MessageCircle, Eye, User, Building2, Book as BookIcon, Globe, 
   ChevronDown, ArrowLeft, ShoppingBag, 
-  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Layers, ArrowRight, Baby, BookText, Edit, Trash2, Tag, Hash, Image as ImageIcon,
-  Star, Flame, Zap
+  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Layers, ArrowRight, 
+  Star, Flame, Zap, Hourglass
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -62,7 +62,7 @@ const getWaLink = (book: any) => {
     return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
 };
 
-// --- KOMPONEN: PREMIUM STICKER BADGE (SAMA PERSIS DENGAN MAIN PAGE) ---
+// --- KOMPONEN: PREMIUM STICKER BADGE (SAMA DENGAN MAIN PAGE) ---
 const StickerBadge = ({ type }: { type: string }) => {
     if (!type) return null;
 
@@ -70,12 +70,14 @@ const StickerBadge = ({ type }: { type: string }) => {
         case 'BEST SELLER':
             return (
                 <div className="absolute -top-4 -right-4 z-30 flex flex-col items-center group-hover:scale-110 transition-transform duration-300 origin-top">
+                    {/* Ribbon Emas */}
                     <div className="relative flex flex-col items-center animate-bounce-slow">
                         <div className="w-14 h-14 rounded-full bg-gradient-to-br from-yellow-300 via-yellow-500 to-yellow-600 shadow-xl border-2 border-white flex flex-col items-center justify-center text-center z-10">
                             <span className="text-[8px] font-black text-yellow-900 leading-none">BEST</span>
                             <span className="text-[8px] font-black text-white leading-none mt-0.5 drop-shadow-md">SELLER</span>
                             <Star className="w-3 h-3 text-white fill-white mt-0.5 absolute -top-1 right-0 animate-pulse" />
                         </div>
+                        {/* Pita Bawah */}
                         <div className="absolute -bottom-3 z-0 flex gap-1">
                             <div className="w-3 h-5 bg-yellow-600 transform skew-y-[20deg] rounded-b-sm"></div>
                             <div className="w-3 h-5 bg-yellow-600 transform -skew-y-[20deg] rounded-b-sm"></div>
@@ -85,18 +87,21 @@ const StickerBadge = ({ type }: { type: string }) => {
             );
 
         case 'SALE':
+            // Horizontal Red Tag with Hole Punch Dot
             return (
-                <div className="absolute -top-3 -right-2 z-30 group-hover:rotate-12 transition-transform duration-500 origin-top-right">
-                    <div className="relative animate-swing">
-                        <div className="w-12 h-16 bg-red-600 rounded-b-lg shadow-lg border-2 border-white flex flex-col items-center justify-center relative">
-                            <div className="w-2 h-2 bg-gray-800 rounded-full absolute top-2 left-1/2 -translate-x-1/2 border border-white/20"></div>
-                            <span className="text-white font-black text-[10px] -rotate-90 tracking-widest mt-2">SALE</span>
+                <div className="absolute -top-3 -right-2 z-30 group-hover:rotate-6 transition-transform duration-300 origin-bottom-left">
+                    <div className="relative shadow-lg">
+                        <div className="bg-red-600 text-white pl-5 pr-3 py-1 rounded-md flex items-center justify-center border-2 border-white/50 relative">
+                            {/* Titik Kecil (Lubang Tag) */}
+                            <div className="absolute left-1.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-white rounded-full shadow-sm"></div>
+                            <span className="font-black text-[10px] tracking-widest">SALE</span>
                         </div>
                     </div>
                 </div>
             );
 
         case 'NEW':
+            // Green Starburst Design
             return (
                 <div className="absolute -top-5 -right-5 z-30 group-hover:rotate-180 transition-transform duration-700">
                     <div className="relative w-16 h-16 flex items-center justify-center">
@@ -122,7 +127,7 @@ const StickerBadge = ({ type }: { type: string }) => {
             return (
                 <div className="absolute -top-3 -right-3 z-30 group-hover:-translate-y-1 transition-transform duration-300">
                     <div className="bg-blue-600 text-white px-3 py-1.5 rounded-full border-2 border-white shadow-lg flex items-center gap-1.5 animate-float">
-                        <Clock className="w-3 h-3 text-blue-200" /> 
+                        <Hourglass className="w-3 h-3 text-blue-200" /> {/* JAM PASIR */}
                         <div className="flex flex-col items-start leading-none">
                             <span className="text-[7px] font-bold text-blue-200 uppercase">Coming</span>
                             <span className="text-[8px] font-black uppercase">Soon</span>
@@ -316,7 +321,7 @@ export default function KatalogPage() {
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
               {/* Filter Loops */}
               {[
-                  { label: "Status", val: filterStatus, set: setFilterStatus, opts: ["READY", "PO", "REFERENSI"], default: "Semua Status" },
+                  { label: "Status", val: filterStatus, set: setFilterStatus, opts: ["READY", "PO", "BACKLIST"], default: "Semua Status" },
                   { label: "Jenis Buku", val: filterCategory, set: setFilterCategory, opts: ["Impor", "Lokal"], default: "Semua Jenis" },
                   { label: "Umur", val: filterAge, set: setFilterAge, opts: uniqueAges.filter(x => x !== 'Semua'), default: "Semua Umur" },
                   { label: "Penerbit", val: filterPublisher, set: setFilterPublisher, opts: uniquePublishers.filter(x => x !== 'Semua'), default: "Semua Penerbit" },
@@ -381,7 +386,7 @@ export default function KatalogPage() {
                         onClick={() => setSelectedGroup(group)} 
                         className="group relative bg-white p-3 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-2 cursor-pointer border border-transparent hover:border-orange-100 h-full flex flex-col"
                     >
-                        {/* --- STIKER LABEL --- */}
+                        {/* --- FITUR STICKER LABEL --- */}
                         {displayBook.sticker_text && (
                             <StickerBadge type={displayBook.sticker_text} />
                         )}
@@ -407,7 +412,7 @@ export default function KatalogPage() {
                                     </span>
                                 ) : (
                                     <span className="bg-slate-500 text-white text-[10px] px-2 py-1 rounded-full font-bold shadow-md flex items-center gap-1">
-                                        <Bookmark className="w-3 h-3" /> REFERENSI
+                                        <Bookmark className="w-3 h-3" /> BACKLIST
                                     </span>
                                 )}
                             </div>
@@ -559,7 +564,7 @@ export default function KatalogPage() {
                         ) : activeVariant.status === 'PO' ? (
                             <span className="inline-block px-3 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded-full">PRE-ORDER</span>
                         ) : (
-                            <span className="inline-block px-3 py-1 bg-slate-100 text-slate-700 text-xs font-bold rounded-full">KATALOG REFERENSI</span>
+                            <span className="inline-block px-3 py-1 bg-slate-100 text-slate-700 text-xs font-bold rounded-full">BACKLIST</span>
                         )}
                         <span className="inline-block px-3 py-1 bg-[#FF9E9E] text-white text-xs font-bold rounded-full">{activeVariant.age}</span>
                         <span className="inline-block px-3 py-1 bg-purple-100 text-purple-700 text-xs font-bold rounded-full">{activeVariant.category}</span>
@@ -631,7 +636,7 @@ export default function KatalogPage() {
                     )}
                     
                     <div className="flex gap-3 mt-auto pt-4">
-                         <a href={getWaLink(activeVariant)} target="_blank" className={`flex-1 text-white py-3 rounded-xl font-bold text-center hover:bg-[#6D4C41] transition-colors flex items-center justify-center gap-2 shadow-md hover:shadow-lg ${activeVariant.status === 'REFERENSI' ? 'bg-slate-500 hover:bg-slate-600' : 'bg-[#8B5E3C] hover:bg-[#6D4C41]'}`}>
+                         <a href={getWaLink(activeVariant)} target="_blank" className={`flex-1 text-white py-3 rounded-xl font-bold text-center hover:bg-[#6D4C41] transition-colors flex items-center justify-center gap-2 shadow-md hover:shadow-lg ${activeVariant.status === 'BACKLIST' ? 'bg-slate-500 hover:bg-slate-600' : 'bg-[#8B5E3C] hover:bg-[#6D4C41]'}`}>
                             <MessageCircle className="w-5 h-5" /> 
                             {activeVariant.status === 'READY' ? 'Beli Sekarang' : 
                              activeVariant.status === 'PO' ? 'Ikut PO Sekarang' : 

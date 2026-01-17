@@ -501,7 +501,7 @@ export default function AdminPage() {
               <div className="w-full xl:w-auto grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                 <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-4 py-3.5 rounded-2xl bg-[#F8F9FA] text-[#8B5E3C] font-bold outline-none border-none focus:ring-2 focus:ring-orange-50 text-xs cursor-pointer">
                   <option value="Semua">Status Stok</option>
-                  <option value="READY">READY</option><option value="PO">PO</option><option value="REFERENSI">REFERENSI</option>
+                  <option value="READY">READY</option><option value="PO">PO</option><option value="BACKLIST">BACKLIST</option>
                 </select>
 
                 <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="px-4 py-3.5 rounded-2xl bg-[#F8F9FA] text-[#8B5E3C] font-bold outline-none border-none focus:ring-2 focus:ring-orange-50 text-xs cursor-pointer">
@@ -634,7 +634,7 @@ export default function AdminPage() {
                   <div>
                     <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2"><Clock className="w-3 h-3"/> Status Katalog</label>
                     <select value={formData.status || 'READY'} onChange={(e) => setFormData({...formData, status: e.target.value})} className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 font-bold text-gray-900 outline-none">
-                      <option value="READY">READY STOCK</option><option value="PO">PRE-ORDER</option><option value="REFERENSI">REFERENSI</option>
+                      <option value="READY">READY STOCK</option><option value="PO">PRE-ORDER</option><option value="BACKLIST">BACKLIST</option>
                     </select>
                   </div>
                   <div>
