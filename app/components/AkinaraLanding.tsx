@@ -1,5 +1,6 @@
 'use client';
 
+import { SpeedInsights } from "@vercel/speed-insights/next"
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Instagram, MessageCircle, ShoppingBag, Star, Truck, Heart, Menu, X, 
