@@ -7,9 +7,10 @@ import {
   MessageCircle, Eye, User, Building2, Book as BookIcon, Globe, 
   ChevronDown, ArrowLeft, ShoppingBag, 
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Layers, ArrowRight, 
-  Star, Flame, Zap, Hourglass
+  Star, Flame, Zap, Hourglass, ShoppingCart, Minus, Plus, Trash2, AlertCircle // Added AlertCircle
 } from 'lucide-react';
 import Link from 'next/link';
+import { useCart } from '../context/CartContext'; // Import Cart Context
 
 // --- UTILITY COMPONENT ---
 const Reveal = ({ children, delay = 0, className = "" }: { children: React.ReactNode, delay?: number, className?: string }) => {
@@ -49,20 +50,102 @@ const getEmbedUrl = (url: string) => {
     return url;
 };
 
+// Fungsi getWaLink untuk Backlist
 const getWaLink = (book: any) => {
     const phone = "6282314336969"; 
-    let text = "";
-    if (book.status === 'READY') {
-        text = `Halo Admin Akinara, saya mau pesan buku *${book.title}* (${book.type}) yang Ready Stock.`;
-    } else if (book.status === 'PO') {
-        text = `Halo Admin Akinara, saya mau ikut PO Batch ini untuk buku *${book.title}* (${book.type}).`;
-    } else {
-        text = `Halo Admin Akinara, saya tertarik dengan buku *${book.title}* (${book.type}). Apakah varian ini akan ada di Batch PO berikutnya?`;
-    }
+    const text = `Halo Admin Akinara, saya tertarik dengan buku *${book.title}* (${book.type}). Apakah varian ini akan ada di Batch PO berikutnya?`;
     return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
 };
 
-// --- KOMPONEN: PREMIUM STICKER BADGE (SAMA DENGAN MAIN PAGE) ---
+// --- KOMPONEN: CART DRAWER (SAMA DENGAN MAIN PAGE) ---
+const CartDrawer = () => {
+    const { 
+        isCartOpen, setIsCartOpen, cartItems, 
+        removeFromCart, decreaseQuantity, addToCart, 
+        getCartTotal, checkoutToWhatsApp, hasMixedItems 
+    } = useCart();
+
+    if (!isCartOpen) return null;
+
+    return (
+        <div className="fixed inset-0 z-[100] flex justify-end">
+            <div 
+                className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity" 
+                onClick={() => setIsCartOpen(false)}
+            ></div>
+            <div className="relative w-full max-w-md bg-[#FFF9F0] h-full shadow-2xl flex flex-col animate-slide-in-right">
+                <div className="p-6 border-b border-orange-100 flex justify-between items-center bg-white">
+                    <h2 className="text-xl font-bold text-[#8B5E3C] flex items-center gap-2">
+                        <ShoppingBag className="w-5 h-5 text-[#FF9E9E]" /> Keranjang Belanja
+                    </h2>
+                    <button 
+                        onClick={() => setIsCartOpen(false)}
+                        className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-red-500 transition-colors"
+                    >
+                        <X className="w-6 h-6" />
+                    </button>
+                </div>
+
+                {/* Smart Warning */}
+                {hasMixedItems && (
+                    <div className="bg-yellow-50 border-b border-yellow-200 p-4 flex gap-3 items-start animate-fade-in">
+                        <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                        <div>
+                            <p className="text-sm font-bold text-yellow-800">Order Campuran</p>
+                            <p className="text-xs text-yellow-700 mt-1 leading-relaxed">
+                                Kamu menggabungkan buku <b>Ready</b> & <b>PO</b>. Pengiriman mungkin terpisah (ongkir dobel) atau menunggu PO tiba. Admin akan konfirmasi via WA.
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                    {cartItems.length === 0 ? (
+                        <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-50">
+                            <ShoppingCart className="w-16 h-16 text-orange-200" />
+                            <p className="text-[#8B5E3C] font-medium">Keranjangmu masih kosong.</p>
+                            <button onClick={() => setIsCartOpen(false)} className="text-sm underline text-[#FF9E9E]">Cari buku dulu yuk!</button>
+                        </div>
+                    ) : (
+                        cartItems.map((item) => (
+                            <div key={item.id} className="flex gap-4 bg-white p-3 rounded-2xl shadow-sm border border-orange-50 relative group">
+                                <div className={`absolute top-0 right-0 rounded-bl-xl rounded-tr-xl px-2 py-0.5 text-[8px] font-bold text-white ${item.status === 'READY' ? 'bg-green-500' : 'bg-blue-500'}`}>{item.status}</div>
+                                <div className="w-20 h-24 flex-shrink-0 bg-gray-100 rounded-xl overflow-hidden">
+                                    <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
+                                </div>
+                                <div className="flex-1 flex flex-col justify-between pt-2">
+                                    <div>
+                                        <h4 className="font-bold text-[#8B5E3C] line-clamp-1 text-sm">{item.title}</h4>
+                                        <p className="text-xs text-orange-400 font-bold mt-1">Rp {item.price.toLocaleString('id-ID')}</p>
+                                    </div>
+                                    <div className="flex items-center justify-between mt-2">
+                                        <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-2 py-1">
+                                            <button onClick={() => decreaseQuantity(item.id)} className="w-6 h-6 flex items-center justify-center bg-white rounded-md shadow-sm text-[#8B5E3C] hover:text-red-500 disabled:opacity-50"><Minus className="w-3 h-3" /></button>
+                                            <span className="text-sm font-bold text-[#8B5E3C] w-4 text-center">{item.quantity}</span>
+                                            <button onClick={() => addToCart(item)} className="w-6 h-6 flex items-center justify-center bg-[#8B5E3C] text-white rounded-md shadow-sm hover:bg-[#6D4C41]"><Plus className="w-3 h-3" /></button>
+                                        </div>
+                                        <button onClick={() => removeFromCart(item.id)} className="text-gray-300 hover:text-red-500 transition-colors p-1"><Trash2 className="w-4 h-4" /></button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+                {cartItems.length > 0 && (
+                    <div className="p-6 bg-white border-t border-orange-100 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)]">
+                        <div className="flex justify-between items-center mb-4">
+                            <span className="text-sm text-gray-500 font-medium">Total Estimasi</span>
+                            <span className="text-xl font-black text-[#8B5E3C]">Rp {getCartTotal().toLocaleString('id-ID')}</span>
+                        </div>
+                        <button onClick={checkoutToWhatsApp} className="w-full py-4 bg-[#25D366] hover:bg-[#1ebd5a] text-white rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-95"><MessageCircle className="w-5 h-5" /> Checkout via WhatsApp</button>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+// --- KOMPONEN: PREMIUM STICKER BADGE ---
 const StickerBadge = ({ type }: { type: string }) => {
     if (!type) return null;
 
@@ -70,14 +153,12 @@ const StickerBadge = ({ type }: { type: string }) => {
         case 'BEST SELLER':
             return (
                 <div className="absolute -top-4 -right-4 z-30 flex flex-col items-center group-hover:scale-110 transition-transform duration-300 origin-top">
-                    {/* Ribbon Emas */}
                     <div className="relative flex flex-col items-center animate-bounce-slow">
                         <div className="w-14 h-14 rounded-full bg-gradient-to-br from-yellow-300 via-yellow-500 to-yellow-600 shadow-xl border-2 border-white flex flex-col items-center justify-center text-center z-10">
                             <span className="text-[8px] font-black text-yellow-900 leading-none">BEST</span>
                             <span className="text-[8px] font-black text-white leading-none mt-0.5 drop-shadow-md">SELLER</span>
                             <Star className="w-3 h-3 text-white fill-white mt-0.5 absolute -top-1 right-0 animate-pulse" />
                         </div>
-                        {/* Pita Bawah */}
                         <div className="absolute -bottom-3 z-0 flex gap-1">
                             <div className="w-3 h-5 bg-yellow-600 transform skew-y-[20deg] rounded-b-sm"></div>
                             <div className="w-3 h-5 bg-yellow-600 transform -skew-y-[20deg] rounded-b-sm"></div>
@@ -87,12 +168,10 @@ const StickerBadge = ({ type }: { type: string }) => {
             );
 
         case 'SALE':
-            // Horizontal Red Tag with Hole Punch Dot
             return (
                 <div className="absolute -top-3 -right-2 z-30 group-hover:rotate-6 transition-transform duration-300 origin-bottom-left">
                     <div className="relative shadow-lg">
                         <div className="bg-red-600 text-white pl-5 pr-3 py-1 rounded-md flex items-center justify-center border-2 border-white/50 relative">
-                            {/* Titik Kecil (Lubang Tag) */}
                             <div className="absolute left-1.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-white rounded-full shadow-sm"></div>
                             <span className="font-black text-[10px] tracking-widest">SALE</span>
                         </div>
@@ -101,7 +180,6 @@ const StickerBadge = ({ type }: { type: string }) => {
             );
 
         case 'NEW':
-            // Green Starburst Design
             return (
                 <div className="absolute -top-5 -right-5 z-30 group-hover:rotate-180 transition-transform duration-700">
                     <div className="relative w-16 h-16 flex items-center justify-center">
@@ -127,7 +205,7 @@ const StickerBadge = ({ type }: { type: string }) => {
             return (
                 <div className="absolute -top-3 -right-3 z-30 group-hover:-translate-y-1 transition-transform duration-300">
                     <div className="bg-blue-600 text-white px-3 py-1.5 rounded-full border-2 border-white shadow-lg flex items-center gap-1.5 animate-float">
-                        <Hourglass className="w-3 h-3 text-blue-200" /> {/* JAM PASIR */}
+                        <Hourglass className="w-3 h-3 text-blue-200" /> 
                         <div className="flex flex-col items-start leading-none">
                             <span className="text-[7px] font-bold text-blue-200 uppercase">Coming</span>
                             <span className="text-[8px] font-black uppercase">Soon</span>
@@ -184,6 +262,8 @@ export default function KatalogPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12; 
   const topRef = useRef<HTMLDivElement>(null);
+
+  const { addToCart, getCartCount, setIsCartOpen } = useCart();
 
   useEffect(() => {
     async function fetchBooks() {
@@ -270,71 +350,38 @@ export default function KatalogPage() {
 
   return (
     <div className="min-h-screen bg-[#FFF9F0] font-sans text-[#6D4C41]">
-      
-      {/* NAVBAR */}
       <nav className="sticky top-0 z-40 bg-[#FFF9F0]/90 backdrop-blur-md border-b border-orange-100 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <Link href="/" className="flex items-center gap-2 text-[#8B5E3C] hover:text-[#FF9E9E] transition-colors font-bold">
-            <ArrowLeft className="w-5 h-5" /> Kembali
-          </Link>
-          <div className="text-xl font-bold text-[#8B5E3C]">
-            Akinara<span className="text-[#FF9E9E]">Catalog</span>
+          <Link href="/" className="flex items-center gap-2 text-[#8B5E3C] hover:text-[#FF9E9E] transition-colors font-bold"><ArrowLeft className="w-5 h-5" /> Kembali</Link>
+          <div className="text-xl font-bold text-[#8B5E3C]">Akinara<span className="text-[#FF9E9E]">Catalog</span></div>
+          <div className="flex items-center gap-4">
+            <button onClick={() => setIsCartOpen(true)} className="relative p-2 text-[#8B5E3C] hover:text-[#FF9E9E] transition-colors">
+                <ShoppingCart className="w-6 h-6" />
+                {getCartCount() > 0 && <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">{getCartCount()}</span>}
+            </button>
+            <a href="https://shopee.co.id/akinarabooks" target="_blank" className="bg-[#FF9E9E] text-white p-2 rounded-full hover:bg-[#ff8585] transition-colors"><ShoppingBag className="w-5 h-5" /></a>
           </div>
-          <a href="https://shopee.co.id/akinarabooks" target="_blank" className="bg-[#FF9E9E] text-white p-2 rounded-full hover:bg-[#ff8585] transition-colors">
-            <ShoppingBag className="w-5 h-5" />
-          </a>
         </div>
       </nav>
 
       <div className="max-w-7xl mx-auto px-4 py-8 md:py-12">
-        <Reveal>
-          <div className="text-center mb-10">
-            <h1 className="text-3xl md:text-5xl font-extrabold text-[#8B5E3C] mb-4">
-              Koleksi Buku Pilihan
-            </h1>
-            <p className="text-[#6D4C41] text-base md:text-lg max-w-2xl mx-auto">
-              Temukan buku yang tepat berdasarkan usia, status ketersediaan, atau kategori.
-            </p>
-          </div>
-        </Reveal>
-
-        {/* --- FILTER BAR --- */}
+        <Reveal><div className="text-center mb-10"><h1 className="text-3xl md:text-5xl font-extrabold text-[#8B5E3C] mb-4">Koleksi Buku Pilihan</h1><p className="text-[#6D4C41] text-base md:text-lg max-w-2xl mx-auto">Temukan buku yang tepat berdasarkan usia, status ketersediaan, atau kategori.</p></div></Reveal>
         <div ref={topRef} className="scroll-mt-24"></div> 
         <Reveal delay={100}>
           <div className="bg-white p-6 rounded-3xl shadow-sm border border-orange-100 mb-10">
             <div className="flex flex-col md:flex-row gap-4 items-center justify-between mb-6">
-              <div className="flex items-center gap-2 text-[#8B5E3C] font-bold text-lg w-full md:w-auto">
-                <Filter className="w-5 h-5" /> Filter Pencarian
-              </div>
+              <div className="flex items-center gap-2 text-[#8B5E3C] font-bold text-lg w-full md:w-auto"><Filter className="w-5 h-5" /> Filter Pencarian</div>
               <div className="relative w-full md:w-1/3">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input 
-                  type="text" 
-                  placeholder="Cari judul atau penulis..." 
-                  value={filterSearch}
-                  onChange={(e) => setFilterSearch(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-orange-100 focus:outline-none focus:ring-2 focus:ring-[#FF9E9E]/50 bg-[#FFF9F0]"
-                />
+                <input type="text" placeholder="Cari judul atau penulis..." value={filterSearch} onChange={(e) => setFilterSearch(e.target.value)} className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-orange-100 focus:outline-none focus:ring-2 focus:ring-[#FF9E9E]/50 bg-[#FFF9F0]" />
               </div>
             </div>
-
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-              {/* Filter Loops */}
-              {[
-                  { label: "Status", val: filterStatus, set: setFilterStatus, opts: ["READY", "PO", "BACKLIST"], default: "Semua Status" },
-                  { label: "Jenis Buku", val: filterCategory, set: setFilterCategory, opts: ["Impor", "Lokal"], default: "Semua Jenis" },
-                  { label: "Umur", val: filterAge, set: setFilterAge, opts: uniqueAges.filter(x => x !== 'Semua'), default: "Semua Umur" },
-                  { label: "Penerbit", val: filterPublisher, set: setFilterPublisher, opts: uniquePublishers.filter(x => x !== 'Semua'), default: "Semua Penerbit" },
-                  { label: "Format", val: filterType, set: setFilterType, opts: uniqueTypes.filter(x => x !== 'Semua'), default: "Semua Format" }
-              ].map((f, i) => (
+              {[{ label: "Status", val: filterStatus, set: setFilterStatus, opts: ["READY", "PO", "BACKLIST"], default: "Semua Status" },{ label: "Jenis Buku", val: filterCategory, set: setFilterCategory, opts: ["Impor", "Lokal"], default: "Semua Jenis" },{ label: "Umur", val: filterAge, set: setFilterAge, opts: uniqueAges.filter(x => x !== 'Semua'), default: "Semua Umur" },{ label: "Penerbit", val: filterPublisher, set: setFilterPublisher, opts: uniquePublishers.filter(x => x !== 'Semua'), default: "Semua Penerbit" },{ label: "Format", val: filterType, set: setFilterType, opts: uniqueTypes.filter(x => x !== 'Semua'), default: "Semua Format" }].map((f, i) => (
                 <div key={i} className="relative">
                     <label className="text-xs font-bold text-orange-400 ml-1 mb-1 block">{f.label}</label>
                     <div className="relative">
-                    <select 
-                        value={f.val}
-                        onChange={(e) => f.set(e.target.value)}
-                        className="w-full appearance-none px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-100 text-[#8B5E3C] font-medium focus:outline-none focus:border-[#FF9E9E] truncate pr-8"
-                    >
+                    <select value={f.val} onChange={(e) => f.set(e.target.value)} className="w-full appearance-none px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-100 text-[#8B5E3C] font-medium focus:outline-none focus:border-[#FF9E9E] truncate pr-8">
                         <option value="Semua">{f.default}</option>
                         {f.opts.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                     </select>
@@ -343,34 +390,17 @@ export default function KatalogPage() {
                 </div>
               ))}
             </div>
-            
             <div className="mt-4 flex justify-between items-center border-t border-gray-100 pt-3">
-              <button 
-                onClick={() => {
-                  setFilterType('Semua'); setFilterStatus('Semua'); setFilterCategory('Semua');
-                  setFilterAge('Semua'); setFilterPublisher('Semua'); setFilterSearch('');
-                }}
-                className="text-xs text-[#FF9E9E] font-bold hover:underline"
-              >
-                Reset Semua Filter
-              </button>
-              <span className="text-xs text-orange-400 font-medium">
-                Total: <b>{processedBooks.length}</b> Judul
-              </span>
+              <button onClick={() => { setFilterType('Semua'); setFilterStatus('Semua'); setFilterCategory('Semua'); setFilterAge('Semua'); setFilterPublisher('Semua'); setFilterSearch(''); }} className="text-xs text-[#FF9E9E] font-bold hover:underline">Reset Semua Filter</button>
+              <span className="text-xs text-orange-400 font-medium">Total: <b>{processedBooks.length}</b> Judul</span>
             </div>
           </div>
         </Reveal>
 
-        {/* --- GRID BUKU --- */}
         {loading ? (
-          <div className="text-center py-20">
-             <div className="inline-block w-8 h-8 border-4 border-orange-200 border-t-[#8B5E3C] rounded-full animate-spin mb-2"></div>
-             <p className="text-[#8B5E3C]">Sedang mengambil buku...</p>
-          </div>
+          <div className="text-center py-20"><div className="inline-block w-8 h-8 border-4 border-orange-200 border-t-[#8B5E3C] rounded-full animate-spin mb-2"></div><p className="text-[#8B5E3C]">Sedang mengambil buku...</p></div>
         ) : processedBooks.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-orange-200">
-            <p className="text-lg text-gray-400">Tidak ada buku yang cocok dengan filter ini.</p>
-          </div>
+          <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-orange-200"><p className="text-lg text-gray-400">Tidak ada buku yang cocok dengan filter ini.</p></div>
         ) : (
           <>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-8">
@@ -382,70 +412,29 @@ export default function KatalogPage() {
 
                 return (
                     <Reveal key={idx} delay={idx * 50}>
-                    <div 
-                        onClick={() => setSelectedGroup(group)} 
-                        className="group relative bg-white p-3 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-2 cursor-pointer border border-transparent hover:border-orange-100 h-full flex flex-col"
-                    >
-                        {/* --- FITUR STICKER LABEL --- */}
-                        {displayBook.sticker_text && (
-                            <StickerBadge type={displayBook.sticker_text} />
-                        )}
-
-                        {/* Image Container */}
+                    <div onClick={() => setSelectedGroup(group)} className="group relative bg-white p-3 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-2 cursor-pointer border border-transparent hover:border-orange-100 h-full flex flex-col">
+                        {displayBook.sticker_text && <StickerBadge type={displayBook.sticker_text} />}
                         <div className="aspect-[3/4] rounded-xl overflow-hidden mb-4 relative bg-gray-100">
-                            <img 
-                                src={displayBook.image} 
-                                alt={displayBook.title} 
-                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
-                                loading="lazy"
-                            />
-                            
-                            {/* --- BADGES --- */}
+                            <img src={displayBook.image} alt={displayBook.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" loading="lazy"/>
                             <div className="absolute top-2 right-2 z-10">
                                 {displayBook.status === 'READY' ? (
-                                    <span className="bg-green-500 text-white text-[10px] px-2 py-1 rounded-full font-bold shadow-md flex items-center gap-1">
-                                        <Truck className="w-3 h-3" /> READY
-                                    </span>
+                                    <span className="bg-green-500 text-white text-[10px] px-2 py-1 rounded-full font-bold shadow-md flex items-center gap-1"><Truck className="w-3 h-3" /> READY</span>
                                 ) : displayBook.status === 'PO' ? (
-                                    <span className="bg-blue-500 text-white text-[10px] px-2 py-1 rounded-full font-bold shadow-md flex items-center gap-1">
-                                        <Clock className="w-3 h-3" /> PO
-                                    </span>
+                                    <span className="bg-blue-500 text-white text-[10px] px-2 py-1 rounded-full font-bold shadow-md flex items-center gap-1"><Clock className="w-3 h-3" /> PO</span>
                                 ) : (
-                                    <span className="bg-slate-500 text-white text-[10px] px-2 py-1 rounded-full font-bold shadow-md flex items-center gap-1">
-                                        <Bookmark className="w-3 h-3" /> BACKLIST
-                                    </span>
+                                    <span className="bg-slate-500 text-white text-[10px] px-2 py-1 rounded-full font-bold shadow-md flex items-center gap-1"><Bookmark className="w-3 h-3" /> BACKLIST</span>
                                 )}
                             </div>
-
                             <div className="absolute top-2 left-2 flex flex-col gap-1 z-10">
                                 <span className="bg-white/90 text-[10px] px-2 py-0.5 rounded-full font-bold text-[#8B5E3C] shadow-sm">{displayBook.type}</span>
                                 <span className="bg-[#FF9E9E]/90 text-[10px] px-2 py-0.5 rounded-full font-bold text-white shadow-sm">{displayBook.age}</span>
                             </div>
-
-                            {/* INDICATOR VARIAN */}
-                            {hasVariants && (
-                                <div className="absolute bottom-2 right-2 z-10">
-                                    <span className="bg-black/60 backdrop-blur-sm text-white text-[10px] px-2 py-1 rounded-full font-bold shadow-md flex items-center gap-1">
-                                        <Layers className="w-3 h-3" /> {group.books.length} Opsi
-                                    </span>
-                                </div>
-                            )}
-
-                            {/* HOVER OVERLAY */}
-                            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                <span className="bg-white/90 text-[#8B5E3C] px-3 py-1 rounded-full text-xs font-bold transform scale-90 group-hover:scale-100 transition-transform">Lihat Detail</span>
-                            </div>
+                            {hasVariants && <div className="absolute bottom-2 right-2 z-10"><span className="bg-black/60 backdrop-blur-sm text-white text-[10px] px-2 py-1 rounded-full font-bold shadow-md flex items-center gap-1"><Layers className="w-3 h-3" /> {group.books.length} Opsi</span></div>}
+                            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"><span className="bg-white/90 text-[#8B5E3C] px-3 py-1 rounded-full text-xs font-bold transform scale-90 group-hover:scale-100 transition-transform">Lihat Detail</span></div>
                         </div>
-
-                        <h3 className="font-bold text-[#8B5E3C] mb-1 line-clamp-2 leading-tight text-left flex-grow">
-                        {displayBook.title}
-                        </h3>
-                        
+                        <h3 className="font-bold text-[#8B5E3C] mb-1 line-clamp-2 leading-tight text-left flex-grow">{displayBook.title}</h3>
                         <div className="mt-2">
-                            <p className="text-[#FF9E9E] font-bold text-lg">
-                                {hasVariants && <span className="text-sm text-gray-400 font-normal mr-1">Mulai</span>}
-                                Rp {minPrice.toLocaleString('id-ID')}
-                            </p>
+                            <p className="text-[#FF9E9E] font-bold text-lg">{hasVariants && <span className="text-sm text-gray-400 font-normal mr-1">Mulai</span>}Rp {minPrice.toLocaleString('id-ID')}</p>
                             <p className="text-xs text-gray-400 mb-1">{displayBook.category}</p>
                         </div>
                     </div>
@@ -453,201 +442,86 @@ export default function KatalogPage() {
                 );
               })}
             </div>
-
-            {/* --- SMART PAGINATION (FIXED) --- */}
             {totalPages > 1 && (
               <div className="flex justify-center items-center gap-2 mt-12 flex-wrap">
-                
-                {/* First Page */}
-                <button 
-                  onClick={() => paginate(1)} 
-                  disabled={currentPage === 1}
-                  className="p-2 rounded-full border border-orange-200 text-[#8B5E3C] hover:bg-orange-50 disabled:opacity-30 disabled:cursor-not-allowed"
-                  title="First Page"
-                >
-                  <ChevronsLeft className="w-5 h-5" />
-                </button>
-
-                {/* Prev Page */}
-                <button 
-                  onClick={() => paginate(currentPage - 1)} 
-                  disabled={currentPage === 1}
-                  className="p-2 rounded-full border border-orange-200 text-[#8B5E3C] hover:bg-orange-50 disabled:opacity-30 disabled:cursor-not-allowed"
-                  title="Previous Page"
-                >
-                  <ChevronLeft className="w-5 h-5" />
-                </button>
-                
-                {/* Page Numbers (1-10, 11-20...) */}
+                <button onClick={() => paginate(1)} disabled={currentPage === 1} className="p-2 rounded-full border border-orange-200 text-[#8B5E3C] hover:bg-orange-50 disabled:opacity-30 disabled:cursor-not-allowed"><ChevronsLeft className="w-5 h-5" /></button>
+                <button onClick={() => paginate(currentPage - 1)} disabled={currentPage === 1} className="p-2 rounded-full border border-orange-200 text-[#8B5E3C] hover:bg-orange-50 disabled:opacity-30 disabled:cursor-not-allowed"><ChevronLeft className="w-5 h-5" /></button>
                 <div className="flex gap-2">
                   {pageNumbers.map((number) => (
-                    <button
-                      key={number}
-                      onClick={() => paginate(number)}
-                      className={`w-10 h-10 rounded-full font-bold text-sm transition-all flex-shrink-0 ${
-                        currentPage === number 
-                          ? 'bg-[#8B5E3C] text-white shadow-lg scale-110' 
-                          : 'bg-white text-[#8B5E3C] border border-orange-100 hover:bg-orange-50'
-                      }`}
-                    >
-                      {number}
-                    </button>
+                    <button key={number} onClick={() => paginate(number)} className={`w-10 h-10 rounded-full font-bold text-sm transition-all flex-shrink-0 ${currentPage === number ? 'bg-[#8B5E3C] text-white shadow-lg scale-110' : 'bg-white text-[#8B5E3C] border border-orange-100 hover:bg-orange-50'}`}>{number}</button>
                   ))}
                 </div>
-
-                {/* Next Page */}
-                <button 
-                  onClick={() => paginate(currentPage + 1)} 
-                  disabled={currentPage === totalPages}
-                  className="p-2 rounded-full border border-orange-200 text-[#8B5E3C] hover:bg-orange-50 disabled:opacity-30 disabled:cursor-not-allowed"
-                  title="Next Page"
-                >
-                  <ChevronRight className="w-5 h-5" />
-                </button>
-
-                {/* Last Page */}
-                <button 
-                  onClick={() => paginate(totalPages)} 
-                  disabled={currentPage === totalPages}
-                  className="p-2 rounded-full border border-orange-200 text-[#8B5E3C] hover:bg-orange-50 disabled:opacity-30 disabled:cursor-not-allowed"
-                  title="Last Page"
-                >
-                  <ChevronsRight className="w-5 h-5" />
-                </button>
-
+                <button onClick={() => paginate(currentPage + 1)} disabled={currentPage === totalPages} className="p-2 rounded-full border border-orange-200 text-[#8B5E3C] hover:bg-orange-50 disabled:opacity-30 disabled:cursor-not-allowed"><ChevronRight className="w-5 h-5" /></button>
+                <button onClick={() => paginate(totalPages)} disabled={currentPage === totalPages} className="p-2 rounded-full border border-orange-200 text-[#8B5E3C] hover:bg-orange-50 disabled:opacity-30 disabled:cursor-not-allowed"><ChevronsRight className="w-5 h-5" /></button>
               </div>
             )}
           </>
         )}
       </div>
 
-      {/* --- MODAL POPUP --- */}
       {selectedGroup && activeVariant && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
             <div className="absolute inset-0" onClick={() => setSelectedGroup(null)}></div>
             <div className="relative bg-white rounded-3xl shadow-2xl max-w-6xl w-full overflow-hidden flex flex-col md:flex-row animate-scale-up max-h-[90vh]">
                 <button onClick={() => setSelectedGroup(null)} className="absolute top-4 right-4 z-10 p-2 bg-white/80 rounded-full hover:bg-white text-gray-500 hover:text-red-500 transition-colors shadow-sm"><X className="w-6 h-6" /></button>
-                
-                {/* Gambar Kiri */}
-                <div className="w-full md:w-1/2 bg-gray-50 flex items-center justify-center p-6 md:p-8">
-                    <img src={activeVariant.image} alt={activeVariant.title} className="max-w-full max-h-[300px] md:max-h-[500px] object-contain rounded-lg shadow-md" />
-                </div>
-                
-                {/* Info Kanan */}
+                <div className="w-full md:w-1/2 bg-gray-50 flex items-center justify-center p-6 md:p-8"><img src={activeVariant.image} alt={activeVariant.title} className="max-w-full max-h-[300px] md:max-h-[500px] object-contain rounded-lg shadow-md" /></div>
                 <div className="w-full md:w-1/2 p-6 md:p-10 flex flex-col text-left overflow-y-auto">
-                    {/* VARIANT SELECTOR */}
                     {selectedGroup.books.length > 1 && (
                         <div className="mb-6">
                             <span className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide">Pilih Format Buku:</span>
                             <div className="flex flex-wrap gap-2">
                                 {selectedGroup.books.map((bookVar) => (
-                                    <button 
-                                        key={bookVar.id}
-                                        onClick={() => setActiveVariant(bookVar)}
-                                        className={`px-4 py-2 rounded-lg text-sm font-bold border transition-all flex flex-col items-start ${
-                                            activeVariant.id === bookVar.id 
-                                            ? 'bg-[#FFF9F0] border-[#8B5E3C] text-[#8B5E3C] ring-2 ring-orange-200' 
-                                            : 'bg-white border-gray-200 text-gray-500 hover:border-orange-300'
-                                        }`}
-                                    >
-                                        <span>{bookVar.type}</span>
-                                        <span className="text-xs font-normal">Rp {bookVar.price.toLocaleString('id-ID')}</span>
-                                    </button>
+                                    <button key={bookVar.id} onClick={() => setActiveVariant(bookVar)} className={`px-4 py-2 rounded-lg text-sm font-bold border transition-all flex flex-col items-start ${activeVariant.id === bookVar.id ? 'bg-[#FFF9F0] border-[#8B5E3C] text-[#8B5E3C] ring-2 ring-orange-200' : 'bg-white border-gray-200 text-gray-500 hover:border-orange-300'}`}><span>{bookVar.type}</span><span className="text-xs font-normal">Rp {bookVar.price.toLocaleString('id-ID')}</span></button>
                                 ))}
                             </div>
                         </div>
                     )}
-                    {/* DETAIL VARIAN */}
                     <div className="flex flex-wrap gap-2 mb-3">
-                        {activeVariant.status === 'READY' ? (
-                            <span className="inline-block px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full">READY STOCK</span>
-                        ) : activeVariant.status === 'PO' ? (
-                            <span className="inline-block px-3 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded-full">PRE-ORDER</span>
-                        ) : (
-                            <span className="inline-block px-3 py-1 bg-slate-100 text-slate-700 text-xs font-bold rounded-full">BACKLIST</span>
-                        )}
+                        {activeVariant.status === 'READY' ? <span className="inline-block px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full">READY STOCK</span> : activeVariant.status === 'PO' ? <span className="inline-block px-3 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded-full">PRE-ORDER</span> : <span className="inline-block px-3 py-1 bg-slate-100 text-slate-700 text-xs font-bold rounded-full">BACKLIST</span>}
+                        <span className="inline-block px-3 py-1 bg-orange-100 text-[#8B5E3C] text-xs font-bold rounded-full">{activeVariant.type}</span>
                         <span className="inline-block px-3 py-1 bg-[#FF9E9E] text-white text-xs font-bold rounded-full">{activeVariant.age}</span>
                         <span className="inline-block px-3 py-1 bg-purple-100 text-purple-700 text-xs font-bold rounded-full">{activeVariant.category}</span>
-                        {selectedGroup.books.length === 1 && (
-                            <span className="inline-block px-3 py-1 bg-orange-100 text-[#8B5E3C] text-xs font-bold rounded-full">{activeVariant.type}</span>
-                        )}
+                        {selectedGroup.books.length === 1 && <span className="inline-block px-3 py-1 bg-orange-100 text-[#8B5E3C] text-xs font-bold rounded-full">{activeVariant.type}</span>}
                     </div>
                     <h3 className="text-2xl md:text-4xl font-bold text-[#8B5E3C] mb-2 leading-tight">{activeVariant.title}</h3>
                     <p className="text-3xl font-bold text-[#FF9E9E] mb-6">Rp {activeVariant.price?.toLocaleString('id-ID')}</p>
                     <div className="bg-slate-50 p-4 rounded-xl mb-6 text-sm text-slate-700 border border-slate-100">
-                        <div className="flex justify-between mb-1">
-                            <span>Status:</span>
-                            <span className="font-bold">
-                                {activeVariant.status === 'READY' ? 'Tersedia' : 
-                                 activeVariant.status === 'PO' ? 'Pre-Order' : 'Belum Masuk Batch PO'}
-                            </span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span>Estimasi Tiba:</span>
-                            <span className="font-bold text-[#8B5E3C]">{activeVariant.eta || 'Hubungi Admin'}</span>
-                        </div>
+                        <div className="flex justify-between mb-1"><span>Status:</span><span className="font-bold">{activeVariant.status === 'READY' ? 'Tersedia' : activeVariant.status === 'PO' ? 'Pre-Order' : 'Belum Masuk Batch PO'}</span></div>
+                        <div className="flex justify-between"><span>Estimasi Tiba:</span><span className="font-bold text-[#8B5E3C]">{activeVariant.eta || 'Hubungi Admin'}</span></div>
                     </div>
                     <div className="space-y-3 mb-6 text-sm text-slate-600">
                         <div className="flex items-center gap-2"><User className="w-4 h-4 text-orange-300" /><span>Penulis: {activeVariant.author}</span></div>
                         <div className="flex items-center gap-2"><Building2 className="w-4 h-4 text-orange-300" /><span>Penerbit: {activeVariant.publisher}</span></div>
                         <div className="flex items-center gap-2"><BookIcon className="w-4 h-4 text-orange-300" /><span>Spesifikasi: {activeVariant.pages}</span></div>
-                        <div className="flex items-start gap-2 mt-2 pt-2 border-t border-dashed border-orange-100">
-                            <Globe className="w-4 h-4 text-orange-300 mt-1 flex-shrink-0" />
-                            <span className="leading-relaxed">{activeVariant.description || activeVariant.desc || "Belum ada deskripsi."}</span>
-                        </div>
+                        <div className="flex items-start gap-2 mt-2 pt-2 border-t border-dashed border-orange-100"><Globe className="w-4 h-4 text-orange-300 mt-1 flex-shrink-0" /><span className="leading-relaxed">{activeVariant.description || activeVariant.desc || "Belum ada deskripsi."}</span></div>
                     </div>
-
-                    {/* --- SMART LINK PREVIEW (UPDATED) --- */}
                     {activeVariant.previewurl && (
                         <div className="mb-6">
-                            <h4 className="font-bold text-[#8B5E3C] mb-2 flex items-center gap-2">
-                                <Eye className="w-4 h-4" /> Preview Buku
-                            </h4>
-                            
-                            {/* LOGIKA PINTAR: Cek apakah link aman di-embed? */}
+                            <h4 className="font-bold text-[#8B5E3C] mb-2 flex items-center gap-2"><Eye className="w-4 h-4" /> Preview Buku</h4>
                             {isEmbeddable(activeVariant.previewurl) ? (
-                                <>
-                                    <div className={`relative w-full rounded-xl overflow-hidden shadow-sm border border-orange-100 ${activeVariant.previewurl.includes('instagram') ? 'h-[550px]' : 'aspect-video'}`}>
-                                        <iframe className="absolute inset-0 w-full h-full" src={getEmbedUrl(activeVariant.previewurl) as string} title="Review Preview" allowFullScreen></iframe>
-                                    </div>
-                                    <a href={activeVariant.previewurl} target="_blank" className="text-xs text-orange-400 hover:text-orange-600 mt-1 inline-block underline">Buka di aplikasi</a>
-                                </>
+                                <><div className={`relative w-full rounded-xl overflow-hidden shadow-sm border border-orange-100 ${activeVariant.previewurl.includes('instagram') ? 'h-[550px]' : 'aspect-video'}`}><iframe className="absolute inset-0 w-full h-full" src={getEmbedUrl(activeVariant.previewurl) as string} title="Review Preview" allowFullScreen></iframe></div><a href={activeVariant.previewurl} target="_blank" className="text-xs text-orange-400 hover:text-orange-600 mt-1 inline-block underline">Buka di aplikasi</a></>
                             ) : (
-                                // JIKA AMAZON / WEBSITE LAIN -> TAMPILKAN TOMBOL FALLBACK
-                                <a 
-                                    href={activeVariant.previewurl} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer"
-                                    className="flex items-center justify-between p-4 bg-orange-50 hover:bg-orange-100 border border-orange-200 rounded-xl transition-all group"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className="bg-white p-2 rounded-lg shadow-sm">
-                                            <BookIcon className="w-6 h-6 text-[#8B5E3C]" />
-                                        </div>
-                                        <div>
-                                            <p className="font-bold text-[#8B5E3C] text-sm">Lihat Isi Buku (Look Inside)</p>
-                                            <p className="text-xs text-orange-400">Preview tersedia di website eksternal</p>
-                                        </div>
-                                    </div>
-                                    <ArrowRight className="w-5 h-5 text-[#8B5E3C] transform group-hover:translate-x-1 transition-transform" />
-                                </a>
+                                <a href={activeVariant.previewurl} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-4 bg-orange-50 hover:bg-orange-100 border border-orange-200 rounded-xl transition-all group"><div className="flex items-center gap-3"><div className="bg-white p-2 rounded-lg shadow-sm"><BookIcon className="w-6 h-6 text-[#8B5E3C]" /></div><div><p className="font-bold text-[#8B5E3C] text-sm">Lihat Isi Buku (Look Inside)</p><p className="text-xs text-orange-400">Preview tersedia di website eksternal</p></div></div><ArrowRight className="w-5 h-5 text-[#8B5E3C] transform group-hover:translate-x-1 transition-transform" /></a>
                             )}
                         </div>
                     )}
-                    
                     <div className="flex gap-3 mt-auto pt-4">
-                         <a href={getWaLink(activeVariant)} target="_blank" className={`flex-1 text-white py-3 rounded-xl font-bold text-center hover:bg-[#6D4C41] transition-colors flex items-center justify-center gap-2 shadow-md hover:shadow-lg ${activeVariant.status === 'BACKLIST' ? 'bg-slate-500 hover:bg-slate-600' : 'bg-[#8B5E3C] hover:bg-[#6D4C41]'}`}>
-                            <MessageCircle className="w-5 h-5" /> 
-                            {activeVariant.status === 'READY' ? 'Beli Sekarang' : 
-                             activeVariant.status === 'PO' ? 'Ikut PO Sekarang' : 
-                             'Tanya Jadwal PO'}
-                        </a>
+                         {/* LOGIKA PEMISAHAN TOMBOL FINAL */}
+                         {activeVariant.status === 'BACKLIST' || activeVariant.status === 'REFERENSI' || activeVariant.status === 'ARCHIVE' ? (
+                            <a href={getWaLink(activeVariant)} target="_blank" className="flex-1 text-white py-3 rounded-xl font-bold text-center hover:bg-slate-600 transition-colors flex items-center justify-center gap-2 shadow-md hover:shadow-lg bg-slate-500">
+                                <MessageCircle className="w-5 h-5" /> Tanya Jadwal PO
+                            </a>
+                         ) : (
+                            <button onClick={() => { addToCart(activeVariant); setSelectedGroup(null); }} className="flex-1 text-white py-3 rounded-xl font-bold text-center hover:bg-[#6D4C41] transition-colors flex items-center justify-center gap-2 shadow-md hover:shadow-lg bg-[#8B5E3C]">
+                                <ShoppingBag className="w-5 h-5" /> Tambah ke Keranjang
+                            </button>
+                         )}
                     </div>
                 </div>
             </div>
         </div>
       )}
-
+      <CartDrawer />
     </div>
   );
 }
