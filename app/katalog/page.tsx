@@ -7,10 +7,10 @@ import {
   MessageCircle, Eye, User, Building2, Book as BookIcon, Globe, 
   ChevronDown, ArrowLeft, ShoppingBag, 
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Layers, ArrowRight, 
-  Star, Flame, Zap, Hourglass, ShoppingCart, Minus, Plus, Trash2, AlertCircle // Added AlertCircle
+  Star, Flame, Zap, Hourglass, ShoppingCart, Minus, Plus, Trash2, AlertCircle
 } from 'lucide-react';
 import Link from 'next/link';
-import { useCart } from '../context/CartContext'; // Import Cart Context
+import { useCart } from '../context/CartContext'; 
 
 // --- UTILITY COMPONENT ---
 const Reveal = ({ children, delay = 0, className = "" }: { children: React.ReactNode, delay?: number, className?: string }) => {
@@ -50,14 +50,13 @@ const getEmbedUrl = (url: string) => {
     return url;
 };
 
-// Fungsi getWaLink untuk Backlist
 const getWaLink = (book: any) => {
     const phone = "6282314336969"; 
     const text = `Halo Admin Akinara, saya tertarik dengan buku *${book.title}* (${book.type}). Apakah varian ini akan ada di Batch PO berikutnya?`;
     return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
 };
 
-// --- KOMPONEN: CART DRAWER (SAMA DENGAN MAIN PAGE) ---
+// --- KOMPONEN: CART DRAWER ---
 const CartDrawer = () => {
     const { 
         isCartOpen, setIsCartOpen, cartItems, 
@@ -86,12 +85,11 @@ const CartDrawer = () => {
                     </button>
                 </div>
 
-                {/* Smart Warning */}
                 {hasMixedItems && (
                     <div className="bg-yellow-50 border-b border-yellow-200 p-4 flex gap-3 items-start animate-fade-in">
                         <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
                         <div>
-                            <p className="text-sm font-bold text-yellow-800">Order Campuran</p>
+                            <p className="text-sm font-bold text-yellow-800">Order Campuran Terdeteksi</p>
                             <p className="text-xs text-yellow-700 mt-1 leading-relaxed">
                                 Kamu menggabungkan buku <b>Ready</b> & <b>PO</b>. Pengiriman mungkin terpisah (ongkir dobel) atau menunggu PO tiba. Admin akan konfirmasi via WA.
                             </p>
@@ -145,77 +143,16 @@ const CartDrawer = () => {
     );
 };
 
-// --- KOMPONEN: PREMIUM STICKER BADGE ---
+// --- STICKER BADGE ---
 const StickerBadge = ({ type }: { type: string }) => {
     if (!type) return null;
-
     switch (type) {
-        case 'BEST SELLER':
-            return (
-                <div className="absolute -top-4 -right-4 z-30 flex flex-col items-center group-hover:scale-110 transition-transform duration-300 origin-top">
-                    <div className="relative flex flex-col items-center animate-bounce-slow">
-                        <div className="w-14 h-14 rounded-full bg-gradient-to-br from-yellow-300 via-yellow-500 to-yellow-600 shadow-xl border-2 border-white flex flex-col items-center justify-center text-center z-10">
-                            <span className="text-[8px] font-black text-yellow-900 leading-none">BEST</span>
-                            <span className="text-[8px] font-black text-white leading-none mt-0.5 drop-shadow-md">SELLER</span>
-                            <Star className="w-3 h-3 text-white fill-white mt-0.5 absolute -top-1 right-0 animate-pulse" />
-                        </div>
-                        <div className="absolute -bottom-3 z-0 flex gap-1">
-                            <div className="w-3 h-5 bg-yellow-600 transform skew-y-[20deg] rounded-b-sm"></div>
-                            <div className="w-3 h-5 bg-yellow-600 transform -skew-y-[20deg] rounded-b-sm"></div>
-                        </div>
-                    </div>
-                </div>
-            );
-
-        case 'SALE':
-            return (
-                <div className="absolute -top-3 -right-2 z-30 group-hover:rotate-6 transition-transform duration-300 origin-bottom-left">
-                    <div className="relative shadow-lg">
-                        <div className="bg-red-600 text-white pl-5 pr-3 py-1 rounded-md flex items-center justify-center border-2 border-white/50 relative">
-                            <div className="absolute left-1.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-white rounded-full shadow-sm"></div>
-                            <span className="font-black text-[10px] tracking-widest">SALE</span>
-                        </div>
-                    </div>
-                </div>
-            );
-
-        case 'NEW':
-            return (
-                <div className="absolute -top-5 -right-5 z-30 group-hover:rotate-180 transition-transform duration-700">
-                    <div className="relative w-16 h-16 flex items-center justify-center">
-                        <svg viewBox="0 0 100 100" className="w-full h-full text-green-400 drop-shadow-lg animate-pulse-slow">
-                            <path fill="currentColor" d="M50 0L61 35L98 35L68 57L79 91L50 70L21 91L32 57L2 35L39 35Z" />
-                        </svg>
-                        <span className="absolute text-green-900 font-black text-[10px] transform -rotate-12">NEW!</span>
-                    </div>
-                </div>
-            );
-
-        case 'HOT':
-            return (
-                <div className="absolute -top-3 -right-3 z-30 group-hover:scale-110 transition-transform duration-300">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-orange-500 to-red-600 border-2 border-white shadow-lg flex flex-col items-center justify-center animate-wiggle">
-                        <Flame className="w-4 h-4 text-yellow-200 fill-yellow-200" />
-                        <span className="text-white font-black text-[9px] italic pr-1">HOT</span>
-                    </div>
-                </div>
-            );
-
-        case 'COMING SOON':
-            return (
-                <div className="absolute -top-3 -right-3 z-30 group-hover:-translate-y-1 transition-transform duration-300">
-                    <div className="bg-blue-600 text-white px-3 py-1.5 rounded-full border-2 border-white shadow-lg flex items-center gap-1.5 animate-float">
-                        <Hourglass className="w-3 h-3 text-blue-200" /> 
-                        <div className="flex flex-col items-start leading-none">
-                            <span className="text-[7px] font-bold text-blue-200 uppercase">Coming</span>
-                            <span className="text-[8px] font-black uppercase">Soon</span>
-                        </div>
-                    </div>
-                </div>
-            );
-
-        default:
-            return null;
+        case 'BEST SELLER': return (<div className="absolute -top-4 -right-4 z-30 flex flex-col items-center group-hover:scale-110 transition-transform duration-300 origin-top"><div className="relative flex flex-col items-center animate-bounce-slow"><div className="w-14 h-14 rounded-full bg-gradient-to-br from-yellow-300 via-yellow-500 to-yellow-600 shadow-xl border-2 border-white flex flex-col items-center justify-center text-center z-10"><span className="text-[8px] font-black text-yellow-900 leading-none">BEST</span><span className="text-[8px] font-black text-white leading-none mt-0.5 drop-shadow-md">SELLER</span><Star className="w-3 h-3 text-white fill-white mt-0.5 absolute -top-1 right-0 animate-pulse" /></div><div className="absolute -bottom-3 z-0 flex gap-1"><div className="w-3 h-5 bg-yellow-600 transform skew-y-[20deg] rounded-b-sm"></div><div className="w-3 h-5 bg-yellow-600 transform -skew-y-[20deg] rounded-b-sm"></div></div></div></div>);
+        case 'SALE': return (<div className="absolute -top-3 -right-2 z-30 group-hover:rotate-6 transition-transform duration-300 origin-bottom-left"><div className="relative shadow-lg"><div className="bg-red-600 text-white pl-5 pr-3 py-1 rounded-md flex items-center justify-center border-2 border-white/50 relative"><div className="absolute left-1.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-white rounded-full shadow-sm"></div><span className="font-black text-[10px] tracking-widest">SALE</span></div></div></div>);
+        case 'NEW': return (<div className="absolute -top-5 -right-5 z-30 group-hover:rotate-180 transition-transform duration-700"><div className="relative w-16 h-16 flex items-center justify-center"><svg viewBox="0 0 100 100" className="w-full h-full text-green-400 drop-shadow-lg animate-pulse-slow"><path fill="currentColor" d="M50 0L61 35L98 35L68 57L79 91L50 70L21 91L32 57L2 35L39 35Z" /></svg><span className="absolute text-green-900 font-black text-[10px] transform -rotate-12">NEW!</span></div></div>);
+        case 'HOT': return (<div className="absolute -top-3 -right-3 z-30 group-hover:scale-110 transition-transform duration-300"><div className="w-12 h-12 rounded-full bg-gradient-to-tr from-orange-500 to-red-600 border-2 border-white shadow-lg flex flex-col items-center justify-center animate-wiggle"><Flame className="w-4 h-4 text-yellow-200 fill-yellow-200" /><span className="text-white font-black text-[9px] italic pr-1">HOT</span></div></div>);
+        case 'COMING SOON': return (<div className="absolute -top-3 -right-3 z-30 group-hover:-translate-y-1 transition-transform duration-300"><div className="bg-blue-600 text-white px-3 py-1.5 rounded-full border-2 border-white shadow-lg flex items-center gap-1.5 animate-float"><Hourglass className="w-3 h-3 text-blue-200" /><div className="flex flex-col items-start leading-none"><span className="text-[7px] font-bold text-blue-200 uppercase">Coming</span><span className="text-[8px] font-black uppercase">Soon</span></div></div></div>);
+        default: return null;
     }
 };
 
@@ -265,16 +202,44 @@ export default function KatalogPage() {
 
   const { addToCart, getCartCount, setIsCartOpen } = useCart();
 
+  // --- FETCHING & SORTING LOGIC ---
   useEffect(() => {
     async function fetchBooks() {
       setLoading(true);
       const { data, error } = await supabase
         .from('books')
-        .select('*')
-        .order('id', { ascending: true });
+        .select('*');
+        // Kita hilangkan .order() dari Supabase, kita sort di client
 
-      if (error) console.error('Error fetching:', error);
-      else setBooks(data || []);
+      if (error) {
+        console.error('Error fetching:', error);
+      } else if (data) {
+        // DEFINISI PRIORITAS STATUS
+        // Angka lebih kecil = Posisi lebih atas
+        const priority: { [key: string]: number } = {
+            'READY': 1,
+            'PO': 2,
+            'BACKLIST': 3,
+            'ARCHIVE': 4,
+            'REFERENSI': 5
+        };
+
+        // LOGIKA SORTING
+        const sortedData = data.sort((a, b) => {
+            const priorityA = priority[a.status] || 99; // 99 untuk status yg tidak dikenal
+            const priorityB = priority[b.status] || 99;
+
+            // 1. Sort berdasarkan Priority Status
+            if (priorityA !== priorityB) {
+                return priorityA - priorityB;
+            }
+            
+            // 2. Jika Status sama, Sort berdasarkan ID (agar stabil)
+            return a.id - b.id;
+        });
+
+        setBooks(sortedData);
+      }
       setLoading(false);
     }
     fetchBooks();
@@ -286,6 +251,7 @@ export default function KatalogPage() {
 
   useEffect(() => {
     if (selectedGroup && selectedGroup.books.length > 0) {
+        // Pilih varian READY dulu jika ada
         const readyVariant = selectedGroup.books.find(b => b.status === 'READY');
         setActiveVariant(readyVariant || selectedGroup.books[0]);
     }
@@ -318,6 +284,7 @@ export default function KatalogPage() {
         groups[cleanTitle].push(book);
     });
 
+    // Karena `filtered` (books) sudah disort, urutan group juga akan mengikuti urutan Ready -> PO
     return Object.keys(groups).map(title => ({
         title,
         books: groups[title]
