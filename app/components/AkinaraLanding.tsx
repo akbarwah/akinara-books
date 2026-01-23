@@ -292,7 +292,7 @@ const faqData = [
             <>
                 Kami menyarankan Anda untuk bergabung ke{" "}
                 <a 
-                    href="https://chat.whatsapp.com/LINK_WA_GROUP_ANDA_DISINI" 
+                    href="https://chat.whatsapp.com/FhPdtrbBbYY6R6J9afilfC" 
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="text-[#FF9E9E] font-bold hover:underline"

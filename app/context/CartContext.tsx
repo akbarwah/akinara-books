@@ -9,6 +9,7 @@ export type Book = {
   price: number;
   image: string;
   status: string; // 'READY', 'PO', 'BACKLIST'
+  type?: string;  // <--- TAMBAHAN: Paperback, Hardcover, Boardbook, dll
   weight?: number; 
 };
 
@@ -101,7 +102,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     return cartItems.reduce((total, item) => total + item.quantity, 0);
   };
 
-  // --- LOGIKA SMART CHECKOUT WA (DENGAN HITUNGAN DP) ---
+  // --- LOGIKA SMART CHECKOUT WA (DENGAN TIPE BUKU) ---
   const checkoutToWhatsApp = () => {
     const phoneNumber = "6282314336969"; 
     
@@ -118,19 +119,23 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
         readyItems.forEach((item, idx) => {
             const sub = item.price * item.quantity;
             subReady += sub;
-            message += `${idx + 1}. ${item.title} (${item.quantity}x) - Rp ${sub.toLocaleString('id-ID')}\n`;
+            // UPDATE: Menambahkan [Tipe Buku] di sebelah judul
+            const typeInfo = item.type ? ` [${item.type}]` : '';
+            message += `${idx + 1}. ${item.title}${typeInfo} (${item.quantity}x) - Rp ${sub.toLocaleString('id-ID')}\n`;
         });
         message += `_Subtotal Ready: Rp ${subReady.toLocaleString('id-ID')} (Wajib Lunas)_\n`;
     }
 
-    // BAGIAN B: PRE-ORDER (Updated with DP Calculation)
+    // BAGIAN B: PRE-ORDER
     if (poItems.length > 0) {
         message += `\n------------------\n*PRE-ORDER (Estimasi 8-12 Minggu)*\n`;
         let subPO = 0;
         poItems.forEach((item, idx) => {
             const sub = item.price * item.quantity;
             subPO += sub;
-            message += `${idx + 1}. ${item.title} (${item.quantity}x) - Rp ${sub.toLocaleString('id-ID')}\n`;
+            // UPDATE: Menambahkan [Tipe Buku] di sebelah judul
+            const typeInfo = item.type ? ` [${item.type}]` : '';
+            message += `${idx + 1}. ${item.title}${typeInfo} (${item.quantity}x) - Rp ${sub.toLocaleString('id-ID')}\n`;
         });
         
         // HITUNG DP 25%
