@@ -1,8 +1,12 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { CartProvider } from "./context/CartContext"; // Import CartProvider
-import { SpeedInsights } from "@vercel/speed-insights/next"
+// 1. Import CartProvider (Wajib agar keranjang jalan)
+import { CartProvider } from "./context/CartContext"; 
+// 2. Import Analytics
+import { Analytics } from "@vercel/analytics/react";
+// 3. Import Speed Insights (INI YANG TADI KURANG)
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,10 +34,14 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {/* Bungkus Children dengan CartProvider */}
+        {/* CartProvider membungkus konten utama */}
         <CartProvider>
           {children}
         </CartProvider>
+
+        {/* Analytics & Speed Insights diletakkan di sini */}
+        <Analytics />
+        <SpeedInsights /> 
       </body>
     </html>
   );
