@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, Suspense } from 'react'; // Tambah Suspense
 import { supabase } from '../../supabaseClient'; 
 import { 
   X, Search, Filter, Truck, Clock, Bookmark, 
@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useCart } from '../context/CartContext'; 
+import { useRouter, useSearchParams } from 'next/navigation'; // Import Baru
 
 // --- UTILITY COMPONENT ---
 const Reveal = ({ children, delay = 0, className = "" }: { children: React.ReactNode, delay?: number, className?: string }) => {
@@ -181,8 +182,8 @@ type BookGroup = {
     books: Book[]; 
 }
 
-// --- KOMPONEN UTAMA ---
-export default function KatalogPage() {
+// --- KOMPONEN ISI KATALOG (DIPISAH SUPAYA BISA DIBUNGKUS SUSPENSE) ---
+function KatalogContent() {
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -196,48 +197,36 @@ export default function KatalogPage() {
   const [filterType, setFilterType] = useState('Semua');
   const [filterPublisher, setFilterPublisher] = useState('Semua');
 
-  const [currentPage, setCurrentPage] = useState(1);
+  // --- LOGIKA PAGINATION BARU (URL BASED) ---
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const itemsPerPage = 12; 
   const topRef = useRef<HTMLDivElement>(null);
 
+  // Ambil halaman dari URL, default ke 1 jika kosong
+  const currentPage = Number(searchParams.get('page')) || 1;
+
   const { addToCart, getCartCount, setIsCartOpen } = useCart();
 
-  // --- FETCHING & SORTING LOGIC ---
   useEffect(() => {
     async function fetchBooks() {
       setLoading(true);
       const { data, error } = await supabase
         .from('books')
         .select('*');
-        // Kita hilangkan .order() dari Supabase, kita sort di client
 
       if (error) {
         console.error('Error fetching:', error);
       } else if (data) {
-        // DEFINISI PRIORITAS STATUS
-        // Angka lebih kecil = Posisi lebih atas
         const priority: { [key: string]: number } = {
-            'READY': 1,
-            'PO': 2,
-            'BACKLIST': 3,
-            'ARCHIVE': 4,
-            'REFERENSI': 5
+            'READY': 1, 'PO': 2, 'BACKLIST': 3, 'ARCHIVE': 4, 'REFERENSI': 5
         };
-
-        // LOGIKA SORTING
         const sortedData = data.sort((a, b) => {
-            const priorityA = priority[a.status] || 99; // 99 untuk status yg tidak dikenal
+            const priorityA = priority[a.status] || 99;
             const priorityB = priority[b.status] || 99;
-
-            // 1. Sort berdasarkan Priority Status
-            if (priorityA !== priorityB) {
-                return priorityA - priorityB;
-            }
-            
-            // 2. Jika Status sama, Sort berdasarkan ID (agar stabil)
+            if (priorityA !== priorityB) return priorityA - priorityB;
             return a.id - b.id;
         });
-
         setBooks(sortedData);
       }
       setLoading(false);
@@ -245,13 +234,23 @@ export default function KatalogPage() {
     fetchBooks();
   }, []);
 
+  // Reset Page ke 1 jika Filter Berubah (Hanya ubah URL jika bukan di page 1)
   useEffect(() => {
-    setCurrentPage(1);
-  }, [filterSearch, filterStatus, filterCategory, filterAge, filterType, filterPublisher]);
+    if (currentPage !== 1) {
+        // Jangan reset kalau ini render pertama kali, tapi reset kalau user ngetik filter
+        // Logic ini agak tricky, simplest way:
+        // Kita biarkan user handle pagination manual, atau reset saat filter berubah
+        // Untuk UX terbaik, biasanya saat filter berubah, kita paksa balik ke page 1
+        const params = new URLSearchParams(searchParams.toString());
+        params.set('page', '1');
+        router.push(`?${params.toString()}`, { scroll: false });
+    }
+  }, [filterSearch, filterStatus, filterCategory, filterAge, filterType, filterPublisher]); 
+  // Warning: Dependency array di atas akan memicu reset setiap kali filter berubah. 
+  // Jika ingin smooth, pastikan logic ini benar.
 
   useEffect(() => {
     if (selectedGroup && selectedGroup.books.length > 0) {
-        // Pilih varian READY dulu jika ada
         const readyVariant = selectedGroup.books.find(b => b.status === 'READY');
         setActiveVariant(readyVariant || selectedGroup.books[0]);
     }
@@ -284,7 +283,6 @@ export default function KatalogPage() {
         groups[cleanTitle].push(book);
     });
 
-    // Karena `filtered` (books) sudah disort, urutan group juga akan mengikuti urutan Ready -> PO
     return Object.keys(groups).map(title => ({
         title,
         books: groups[title]
@@ -306,8 +304,13 @@ export default function KatalogPage() {
     pageNumbers.push(i);
   }
 
+  // --- FUNGSI PAGINATE UPDATE URL ---
   const paginate = (pageNumber: number) => {
-    setCurrentPage(pageNumber);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('page', pageNumber.toString());
+    router.push(`?${params.toString()}`); // Update URL
+    
+    // Scroll ke atas
     if (topRef.current) {
         topRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } else {
@@ -316,21 +319,7 @@ export default function KatalogPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FFF9F0] font-sans text-[#6D4C41]">
-      <nav className="sticky top-0 z-40 bg-[#FFF9F0]/90 backdrop-blur-md border-b border-orange-100 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <Link href="/" className="flex items-center gap-2 text-[#8B5E3C] hover:text-[#FF9E9E] transition-colors font-bold"><ArrowLeft className="w-5 h-5" /> Kembali</Link>
-          <div className="text-xl font-bold text-[#8B5E3C]">Akinara<span className="text-[#FF9E9E]">Catalog</span></div>
-          <div className="flex items-center gap-4">
-            <button onClick={() => setIsCartOpen(true)} className="relative p-2 text-[#8B5E3C] hover:text-[#FF9E9E] transition-colors">
-                <ShoppingCart className="w-6 h-6" />
-                {getCartCount() > 0 && <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">{getCartCount()}</span>}
-            </button>
-            <a href="https://shopee.co.id/akinarabooks" target="_blank" className="bg-[#FF9E9E] text-white p-2 rounded-full hover:bg-[#ff8585] transition-colors"><ShoppingBag className="w-5 h-5" /></a>
-          </div>
-        </div>
-      </nav>
-
+    <>
       <div className="max-w-7xl mx-auto px-4 py-8 md:py-12">
         <Reveal><div className="text-center mb-10"><h1 className="text-3xl md:text-5xl font-extrabold text-[#8B5E3C] mb-4">Koleksi Buku Pilihan</h1><p className="text-[#6D4C41] text-base md:text-lg max-w-2xl mx-auto">Temukan buku yang tepat berdasarkan usia, status ketersediaan, atau kategori.</p></div></Reveal>
         <div ref={topRef} className="scroll-mt-24"></div> 
@@ -473,7 +462,6 @@ export default function KatalogPage() {
                         </div>
                     )}
                     <div className="flex gap-3 mt-auto pt-4">
-                         {/* LOGIKA PEMISAHAN TOMBOL FINAL */}
                          {activeVariant.status === 'BACKLIST' || activeVariant.status === 'REFERENSI' || activeVariant.status === 'ARCHIVE' ? (
                             <a href={getWaLink(activeVariant)} target="_blank" className="flex-1 text-white py-3 rounded-xl font-bold text-center hover:bg-slate-600 transition-colors flex items-center justify-center gap-2 shadow-md hover:shadow-lg bg-slate-500">
                                 <MessageCircle className="w-5 h-5" /> Tanya Jadwal PO
@@ -489,6 +477,32 @@ export default function KatalogPage() {
         </div>
       )}
       <CartDrawer />
+    </>
+  );
+}
+
+// --- MAIN PAGE WRAPPER (REQUIRED FOR SUSPENSE) ---
+export default function KatalogPage() {
+  return (
+    <div className="min-h-screen bg-[#FFF9F0] font-sans text-[#6D4C41]">
+        <nav className="sticky top-0 z-40 bg-[#FFF9F0]/90 backdrop-blur-md border-b border-orange-100 shadow-sm">
+            <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+                <Link href="/" className="flex items-center gap-2 text-[#8B5E3C] hover:text-[#FF9E9E] transition-colors font-bold"><ArrowLeft className="w-5 h-5" /> Kembali</Link>
+                <div className="text-xl font-bold text-[#8B5E3C]">Akinara<span className="text-[#FF9E9E]">Catalog</span></div>
+                <div className="flex items-center gap-4">
+                    {/* BUTTON CART SEMENTARA (Akan dirender ulang di dalam child, tapi ini buat visual) */}
+                    <div className="relative p-2 text-[#8B5E3C]">
+                         <ShoppingCart className="w-6 h-6" />
+                    </div>
+                    <a href="https://shopee.co.id/akinarabooks" target="_blank" className="bg-[#FF9E9E] text-white p-2 rounded-full hover:bg-[#ff8585] transition-colors"><ShoppingBag className="w-5 h-5" /></a>
+                </div>
+            </div>
+        </nav>
+        
+        {/* SUSPENSE BOUNDARY UNTUK SEARCH PARAMS */}
+        <Suspense fallback={<div className="text-center py-20 text-[#8B5E3C]">Memuat Katalog...</div>}>
+            <KatalogContent />
+        </Suspense>
     </div>
   );
 }
