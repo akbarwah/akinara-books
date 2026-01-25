@@ -1,17 +1,17 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo, Suspense } from 'react'; // Tambah Suspense
+import React, { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import { supabase } from '../../supabaseClient'; 
 import { 
   X, Search, Filter, Truck, Clock, Bookmark, 
   MessageCircle, Eye, User, Building2, Book as BookIcon, Globe, 
   ChevronDown, ArrowLeft, ShoppingBag, 
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Layers, ArrowRight, 
-  Star, Flame, Zap, Hourglass, ShoppingCart, Minus, Plus, Trash2, AlertCircle
+  Star, Flame, Zap, Hourglass, ShoppingCart, Minus, Plus, Trash2, AlertCircle, Sparkles // Added Sparkles
 } from 'lucide-react';
 import Link from 'next/link';
 import { useCart } from '../context/CartContext'; 
-import { useRouter, useSearchParams } from 'next/navigation'; // Import Baru
+import { useRouter, useSearchParams } from 'next/navigation';
 
 // --- UTILITY COMPONENT ---
 const Reveal = ({ children, delay = 0, className = "" }: { children: React.ReactNode, delay?: number, className?: string }) => {
@@ -182,7 +182,7 @@ type BookGroup = {
     books: Book[]; 
 }
 
-// --- KOMPONEN ISI KATALOG (DIPISAH SUPAYA BISA DIBUNGKUS SUSPENSE) ---
+// --- KOMPONEN ISI KATALOG ---
 function KatalogContent() {
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
@@ -197,15 +197,12 @@ function KatalogContent() {
   const [filterType, setFilterType] = useState('Semua');
   const [filterPublisher, setFilterPublisher] = useState('Semua');
 
-  // --- LOGIKA PAGINATION BARU (URL BASED) ---
   const router = useRouter();
   const searchParams = useSearchParams();
   const itemsPerPage = 12; 
   const topRef = useRef<HTMLDivElement>(null);
 
-  // Ambil halaman dari URL, default ke 1 jika kosong
   const currentPage = Number(searchParams.get('page')) || 1;
-
   const { addToCart, getCartCount, setIsCartOpen } = useCart();
 
   useEffect(() => {
@@ -234,20 +231,13 @@ function KatalogContent() {
     fetchBooks();
   }, []);
 
-  // Reset Page ke 1 jika Filter Berubah (Hanya ubah URL jika bukan di page 1)
   useEffect(() => {
     if (currentPage !== 1) {
-        // Jangan reset kalau ini render pertama kali, tapi reset kalau user ngetik filter
-        // Logic ini agak tricky, simplest way:
-        // Kita biarkan user handle pagination manual, atau reset saat filter berubah
-        // Untuk UX terbaik, biasanya saat filter berubah, kita paksa balik ke page 1
         const params = new URLSearchParams(searchParams.toString());
         params.set('page', '1');
         router.push(`?${params.toString()}`, { scroll: false });
     }
   }, [filterSearch, filterStatus, filterCategory, filterAge, filterType, filterPublisher]); 
-  // Warning: Dependency array di atas akan memicu reset setiap kali filter berubah. 
-  // Jika ingin smooth, pastikan logic ini benar.
 
   useEffect(() => {
     if (selectedGroup && selectedGroup.books.length > 0) {
@@ -255,6 +245,77 @@ function KatalogContent() {
         setActiveVariant(readyVariant || selectedGroup.books[0]);
     }
   }, [selectedGroup]);
+
+  // --- LOGIKA REKOMENDASI (SCORING + DEDUPLIKASI JUDUL) ---
+  const relatedBooks = useMemo(() => {
+    if (!activeVariant || books.length === 0) return [];
+    
+    // Helper: Ambil 2 kata pertama dari judul (untuk deteksi seri)
+    const getSeriesPrefix = (title: string) => {
+        return title.toLowerCase().replace(/[^\w\s]/gi, '').split(' ').slice(0, 2).join(' ');
+    };
+
+    const currentSeries = getSeriesPrefix(activeVariant.title);
+    const activeTitleClean = activeVariant.title.trim().toLowerCase();
+
+    // 1. Hitung SKOR dulu untuk semua kandidat
+    const scoredCandidates = books
+        .filter(b => b.title.trim().toLowerCase() !== activeTitleClean) // Pastikan bukan buku yang sedang dibuka
+        .map(b => {
+            let score = 0;
+
+            // A. MATCH JUDUL/SERI (Bobot: 10 Poin)
+            if (getSeriesPrefix(b.title) === currentSeries && currentSeries.length > 3) {
+                score += 10;
+            }
+
+            // B. MATCH PENULIS (Bobot: 5 Poin)
+            if (b.author && activeVariant.author && b.author === activeVariant.author) {
+                score += 5;
+            }
+
+            // C. MATCH KATEGORI (Bobot: 1 Poin)
+            if (b.category === activeVariant.category) {
+                score += 1;
+            }
+
+            return { ...b, score };
+        })
+        .filter(b => b.score > 0) // Hanya ambil yang punya kemiripan
+        .sort((a, b) => b.score - a.score); // Urutkan dari skor tertinggi
+
+    // 2. DEDUPLIKASI (Hanya ambil 1 varian per Judul)
+    const uniqueResults: Book[] = [];
+    const seenTitles = new Set<string>();
+
+    for (const book of scoredCandidates) {
+        const cleanTitle = book.title.trim().toLowerCase();
+
+        // Jika judul ini BELUM pernah masuk ke list rekomendasi
+        if (!seenTitles.has(cleanTitle)) {
+            uniqueResults.push(book);
+            seenTitles.add(cleanTitle); // Tandai judul ini sudah diambil
+        }
+
+        // Stop jika sudah dapat 3 rekomendasi unik
+        if (uniqueResults.length >= 3) break;
+    }
+
+    return uniqueResults;
+  }, [activeVariant, books]);
+
+  const handleRelatedClick = (relatedBook: Book) => {
+    const cleanTitle = relatedBook.title.trim();
+    const rawGroup = books.filter(b => b.title.trim() === cleanTitle);
+    
+    if (rawGroup.length > 0) {
+        const newGroup = { title: cleanTitle, books: rawGroup };
+        setSelectedGroup(newGroup);
+        const modalContent = document.querySelector('.modal-content-scroll');
+        if (modalContent) modalContent.scrollTop = 0;
+    }
+  };
+
 
   const uniquePublishers = useMemo(() => ['Semua', ...Array.from(new Set(books.map(b => b.publisher).filter(Boolean))).sort()], [books]);
   const uniqueAges = useMemo(() => ['Semua', ...Array.from(new Set(books.map(b => b.age).filter(Boolean))).sort()], [books]);
@@ -304,13 +365,11 @@ function KatalogContent() {
     pageNumbers.push(i);
   }
 
-  // --- FUNGSI PAGINATE UPDATE URL ---
   const paginate = (pageNumber: number) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set('page', pageNumber.toString());
-    router.push(`?${params.toString()}`); // Update URL
+    router.push(`?${params.toString()}`); 
     
-    // Scroll ke atas
     if (topRef.current) {
         topRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } else {
@@ -421,7 +480,9 @@ function KatalogContent() {
             <div className="relative bg-white rounded-3xl shadow-2xl max-w-6xl w-full overflow-hidden flex flex-col md:flex-row animate-scale-up max-h-[90vh]">
                 <button onClick={() => setSelectedGroup(null)} className="absolute top-4 right-4 z-10 p-2 bg-white/80 rounded-full hover:bg-white text-gray-500 hover:text-red-500 transition-colors shadow-sm"><X className="w-6 h-6" /></button>
                 <div className="w-full md:w-1/2 bg-gray-50 flex items-center justify-center p-6 md:p-8"><img src={activeVariant.image} alt={activeVariant.title} className="max-w-full max-h-[300px] md:max-h-[500px] object-contain rounded-lg shadow-md" /></div>
-                <div className="w-full md:w-1/2 p-6 md:p-10 flex flex-col text-left overflow-y-auto">
+                
+                <div className="w-full md:w-1/2 p-6 md:p-10 flex flex-col text-left overflow-y-auto modal-content-scroll">
+                    
                     {selectedGroup.books.length > 1 && (
                         <div className="mb-6">
                             <span className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide">Pilih Format Buku:</span>
@@ -461,7 +522,7 @@ function KatalogContent() {
                             )}
                         </div>
                     )}
-                    <div className="flex gap-3 mt-auto pt-4">
+                    <div className="flex gap-3 pt-4 mb-8 border-b border-gray-100 pb-8">
                          {activeVariant.status === 'BACKLIST' || activeVariant.status === 'REFERENSI' || activeVariant.status === 'ARCHIVE' ? (
                             <a href={getWaLink(activeVariant)} target="_blank" className="flex-1 text-white py-3 rounded-xl font-bold text-center hover:bg-slate-600 transition-colors flex items-center justify-center gap-2 shadow-md hover:shadow-lg bg-slate-500">
                                 <MessageCircle className="w-5 h-5" /> Tanya Jadwal PO
@@ -472,6 +533,34 @@ function KatalogContent() {
                             </button>
                          )}
                     </div>
+
+                    {/* --- BAGIAN REKOMENDASI PRODUK (DEDUPLIKASI JUDUL) --- */}
+                    {relatedBooks.length > 0 && (
+                        <div className="animate-fade-in">
+                            <h4 className="font-bold text-[#8B5E3C] mb-4 flex items-center gap-2">
+                                <Sparkles className="w-4 h-4 text-yellow-500" /> Mungkin Kamu Suka Juga...
+                            </h4>
+                            <div className="grid grid-cols-3 gap-3">
+                                {relatedBooks.map((relBook) => (
+                                    <div 
+                                        key={relBook.id} 
+                                        onClick={() => handleRelatedClick(relBook)}
+                                        className="cursor-pointer group/card"
+                                    >
+                                        <div className="aspect-[3/4] rounded-lg overflow-hidden bg-gray-100 mb-2 border border-transparent group-hover/card:border-orange-200 transition-all relative">
+                                            <img src={relBook.image} alt={relBook.title} className="w-full h-full object-cover group-hover/card:scale-110 transition-transform duration-500" />
+                                            {relBook.status === 'READY' && <div className="absolute top-1 right-1 w-2 h-2 bg-green-500 rounded-full border border-white"></div>}
+                                        </div>
+                                        <h5 className="text-xs font-bold text-[#6D4C41] line-clamp-2 leading-tight group-hover/card:text-orange-500 transition-colors">
+                                            {relBook.title}
+                                        </h5>
+                                        <p className="text-[10px] text-gray-500 mt-0.5">Rp {relBook.price.toLocaleString('id-ID')}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                 </div>
             </div>
         </div>
@@ -481,7 +570,7 @@ function KatalogContent() {
   );
 }
 
-// --- MAIN PAGE WRAPPER (REQUIRED FOR SUSPENSE) ---
+// --- MAIN PAGE WRAPPER ---
 export default function KatalogPage() {
   return (
     <div className="min-h-screen bg-[#FFF9F0] font-sans text-[#6D4C41]">
@@ -490,7 +579,6 @@ export default function KatalogPage() {
                 <Link href="/" className="flex items-center gap-2 text-[#8B5E3C] hover:text-[#FF9E9E] transition-colors font-bold"><ArrowLeft className="w-5 h-5" /> Kembali</Link>
                 <div className="text-xl font-bold text-[#8B5E3C]">Akinara<span className="text-[#FF9E9E]">Catalog</span></div>
                 <div className="flex items-center gap-4">
-                    {/* BUTTON CART SEMENTARA (Akan dirender ulang di dalam child, tapi ini buat visual) */}
                     <div className="relative p-2 text-[#8B5E3C]">
                          <ShoppingCart className="w-6 h-6" />
                     </div>
@@ -499,7 +587,6 @@ export default function KatalogPage() {
             </div>
         </nav>
         
-        {/* SUSPENSE BOUNDARY UNTUK SEARCH PARAMS */}
         <Suspense fallback={<div className="text-center py-20 text-[#8B5E3C]">Memuat Katalog...</div>}>
             <KatalogContent />
         </Suspense>

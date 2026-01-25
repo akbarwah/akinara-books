@@ -7,10 +7,13 @@ import {
   ArrowRight, MapPin, Mail, Book as BookIcon, User, Globe, Building2, 
   PlayCircle, Eye, Calendar, Clock, Info, ChevronDown, ChevronUp, 
   HelpCircle, EarthIcon, Bookmark, CreditCard, Package, Flame, Zap, Hourglass,
-  Trash2, Plus, Minus, ShoppingCart, AlertCircle // Added AlertCircle
+  Trash2, Plus, Minus, ShoppingCart, AlertCircle 
 } from 'lucide-react';
 import { supabase } from '@/supabaseClient'; 
-import { useCart } from '../context/CartContext'; // Import Cart Context
+import { useCart } from '../context/CartContext'; 
+
+// IMPORT BARU: MiniCatalog
+import MiniCatalog from './MiniCatalog'; 
 
 // --- UTILITY COMPONENT ---
 const Reveal = ({ children, delay = 0, className = "" }: { children: React.ReactNode, delay?: number, className?: string }) => {
@@ -24,38 +27,7 @@ const Reveal = ({ children, delay = 0, className = "" }: { children: React.React
   return <div ref={ref} className={`transition-all duration-1000 ease-out transform ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'} ${className}`} style={{ transitionDelay: `${delay}ms` }}>{children}</div>;
 };
 
-// --- HELPER: SMART EMBED URL ---
-const isEmbeddable = (url: string) => {
-    if (!url) return false;
-    return url.includes('youtube.com') || url.includes('youtu.be') || url.includes('instagram.com');
-};
-
-const getEmbedUrl = (url: string) => {
-    if (!url) return null;
-    if (url.includes('youtube.com') || url.includes('youtu.be')) {
-        let videoId = '';
-        if (url.includes('youtu.be')) videoId = url.split('/').pop()?.split('?')[0] || '';
-        else if (url.includes('watch?v=')) videoId = url.split('v=')[1]?.split('&')[0] || '';
-        else if (url.includes('/embed/')) return url;
-        return `https://www.youtube.com/embed/${videoId}`;
-    }
-    if (url.includes('instagram.com')) {
-        let cleanUrl = url.split('?')[0]; 
-        if (cleanUrl.endsWith('/')) cleanUrl = cleanUrl.slice(0, -1);
-        cleanUrl = cleanUrl.replace('/reel/', '/p/');
-        return `${cleanUrl}/embed`;
-    }
-    return url;
-};
-
-// Fungsi getWaLink untuk Backlist (Tanya Jadwal)
-const getWaLink = (book: any) => {
-    const phone = "6282314336969";
-    const text = `Halo Admin Akinara, saya tertarik dengan buku *${book.title}* (${book.type}). Apakah varian ini akan ada di Batch PO berikutnya?`;
-    return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
-};
-
-// --- KOMPONEN: CART DRAWER (DENGAN SMART WARNING) ---
+// --- KOMPONEN CART DRAWER (Tetap di sini sebagai Global) ---
 const CartDrawer = () => {
     const { 
         isCartOpen, setIsCartOpen, cartItems, 
@@ -73,8 +45,6 @@ const CartDrawer = () => {
             ></div>
 
             <div className="relative w-full max-w-md bg-[#FFF9F0] h-full shadow-2xl flex flex-col animate-slide-in-right">
-                
-                {/* Header */}
                 <div className="p-6 border-b border-orange-100 flex justify-between items-center bg-white">
                     <h2 className="text-xl font-bold text-[#8B5E3C] flex items-center gap-2">
                         <ShoppingBag className="w-5 h-5 text-[#FF9E9E]" /> Keranjang Belanja
@@ -87,7 +57,6 @@ const CartDrawer = () => {
                     </button>
                 </div>
 
-                {/* Smart Warning (Jika Campur) */}
                 {hasMixedItems && (
                     <div className="bg-yellow-50 border-b border-yellow-200 p-4 flex gap-3 items-start animate-fade-in">
                         <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
@@ -100,27 +69,19 @@ const CartDrawer = () => {
                     </div>
                 )}
 
-                {/* List Item */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-4">
                     {cartItems.length === 0 ? (
                         <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-50">
                             <ShoppingCart className="w-16 h-16 text-orange-200" />
                             <p className="text-[#8B5E3C] font-medium">Keranjangmu masih kosong.</p>
-                            <button 
-                                onClick={() => setIsCartOpen(false)}
-                                className="text-sm underline text-[#FF9E9E]"
-                            >
-                                Cari buku dulu yuk!
-                            </button>
+                            <button onClick={() => setIsCartOpen(false)} className="text-sm underline text-[#FF9E9E]">Cari buku dulu yuk!</button>
                         </div>
                     ) : (
                         cartItems.map((item) => (
                             <div key={item.id} className="flex gap-4 bg-white p-3 rounded-2xl shadow-sm border border-orange-50 relative group">
-                                {/* Badge Status Item */}
                                 <div className={`absolute top-0 right-0 rounded-bl-xl rounded-tr-xl px-2 py-0.5 text-[8px] font-bold text-white ${item.status === 'READY' ? 'bg-green-500' : 'bg-blue-500'}`}>
                                     {item.status}
                                 </div>
-
                                 <div className="w-20 h-24 flex-shrink-0 bg-gray-100 rounded-xl overflow-hidden">
                                     <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
                                 </div>
@@ -133,26 +94,11 @@ const CartDrawer = () => {
                                     </div>
                                     <div className="flex items-center justify-between mt-2">
                                         <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-2 py-1">
-                                            <button 
-                                                onClick={() => decreaseQuantity(item.id)}
-                                                className="w-6 h-6 flex items-center justify-center bg-white rounded-md shadow-sm text-[#8B5E3C] hover:text-red-500 disabled:opacity-50"
-                                            >
-                                                <Minus className="w-3 h-3" />
-                                            </button>
+                                            <button onClick={() => decreaseQuantity(item.id)} className="w-6 h-6 flex items-center justify-center bg-white rounded-md shadow-sm text-[#8B5E3C] hover:text-red-500 disabled:opacity-50"><Minus className="w-3 h-3" /></button>
                                             <span className="text-sm font-bold text-[#8B5E3C] w-4 text-center">{item.quantity}</span>
-                                            <button 
-                                                onClick={() => addToCart(item)}
-                                                className="w-6 h-6 flex items-center justify-center bg-[#8B5E3C] text-white rounded-md shadow-sm hover:bg-[#6D4C41]"
-                                            >
-                                                <Plus className="w-3 h-3" />
-                                            </button>
+                                            <button onClick={() => addToCart(item)} className="w-6 h-6 flex items-center justify-center bg-[#8B5E3C] text-white rounded-md shadow-sm hover:bg-[#6D4C41]"><Plus className="w-3 h-3" /></button>
                                         </div>
-                                        <button 
-                                            onClick={() => removeFromCart(item.id)}
-                                            className="text-gray-300 hover:text-red-500 transition-colors p-1"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
+                                        <button onClick={() => removeFromCart(item.id)} className="text-gray-300 hover:text-red-500 transition-colors p-1"><Trash2 className="w-4 h-4" /></button>
                                     </div>
                                 </div>
                             </div>
@@ -160,7 +106,6 @@ const CartDrawer = () => {
                     )}
                 </div>
 
-                {/* Footer Checkout */}
                 {cartItems.length > 0 && (
                     <div className="p-6 bg-white border-t border-orange-100 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)]">
                         <div className="flex justify-between items-center mb-4">
@@ -169,10 +114,7 @@ const CartDrawer = () => {
                                 Rp {getCartTotal().toLocaleString('id-ID')}
                             </span>
                         </div>
-                        <button 
-                            onClick={checkoutToWhatsApp}
-                            className="w-full py-4 bg-[#25D366] hover:bg-[#1ebd5a] text-white rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-95"
-                        >
+                        <button onClick={checkoutToWhatsApp} className="w-full py-4 bg-[#25D366] hover:bg-[#1ebd5a] text-white rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-95">
                             <MessageCircle className="w-5 h-5" /> Checkout via WhatsApp
                         </button>
                     </div>
@@ -180,80 +122,6 @@ const CartDrawer = () => {
             </div>
         </div>
     );
-};
-
-// --- KOMPONEN: PREMIUM STICKER BADGE ---
-const StickerBadge = ({ type }: { type: string }) => {
-    if (!type) return null;
-
-    switch (type) {
-        case 'BEST SELLER':
-            return (
-                <div className="absolute -top-4 -right-4 z-30 flex flex-col items-center group-hover:scale-110 transition-transform duration-300 origin-top">
-                    <div className="relative flex flex-col items-center animate-bounce-slow">
-                        <div className="w-14 h-14 rounded-full bg-gradient-to-br from-yellow-300 via-yellow-500 to-yellow-600 shadow-xl border-2 border-white flex flex-col items-center justify-center text-center z-10">
-                            <span className="text-[8px] font-black text-yellow-900 leading-none">BEST</span>
-                            <span className="text-[8px] font-black text-white leading-none mt-0.5 drop-shadow-md">SELLER</span>
-                            <Star className="w-3 h-3 text-white fill-white mt-0.5 absolute -top-1 right-0 animate-pulse" />
-                        </div>
-                        <div className="absolute -bottom-3 z-0 flex gap-1">
-                            <div className="w-3 h-5 bg-yellow-600 transform skew-y-[20deg] rounded-b-sm"></div>
-                            <div className="w-3 h-5 bg-yellow-600 transform -skew-y-[20deg] rounded-b-sm"></div>
-                        </div>
-                    </div>
-                </div>
-            );
-
-        case 'SALE':
-            return (
-                <div className="absolute -top-3 -right-2 z-30 group-hover:rotate-6 transition-transform duration-300 origin-bottom-left">
-                    <div className="relative shadow-lg">
-                        <div className="bg-red-600 text-white pl-5 pr-3 py-1 rounded-md flex items-center justify-center border-2 border-white/50 relative">
-                            <div className="absolute left-1.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-white rounded-full shadow-sm"></div>
-                            <span className="font-black text-[10px] tracking-widest">SALE</span>
-                        </div>
-                    </div>
-                </div>
-            );
-
-        case 'NEW':
-            return (
-                <div className="absolute -top-5 -right-5 z-30 group-hover:rotate-180 transition-transform duration-700">
-                    <div className="relative w-16 h-16 flex items-center justify-center">
-                        <svg viewBox="0 0 100 100" className="w-full h-full text-green-400 drop-shadow-lg animate-pulse-slow">
-                            <path fill="currentColor" d="M50 0L61 35L98 35L68 57L79 91L50 70L21 91L32 57L2 35L39 35Z" />
-                        </svg>
-                        <span className="absolute text-green-900 font-black text-[10px] transform -rotate-12">NEW!</span>
-                    </div>
-                </div>
-            );
-
-        case 'HOT':
-            return (
-                <div className="absolute -top-3 -right-3 z-30 group-hover:scale-110 transition-transform duration-300">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-orange-500 to-red-600 border-2 border-white shadow-lg flex flex-col items-center justify-center animate-wiggle">
-                        <Flame className="w-4 h-4 text-yellow-200 fill-yellow-200" />
-                        <span className="text-white font-black text-[9px] italic pr-1">HOT</span>
-                    </div>
-                </div>
-            );
-
-        case 'COMING SOON':
-            return (
-                <div className="absolute -top-3 -right-3 z-30 group-hover:-translate-y-1 transition-transform duration-300">
-                    <div className="bg-blue-600 text-white px-3 py-1.5 rounded-full border-2 border-white shadow-lg flex items-center gap-1.5 animate-float">
-                        <Hourglass className="w-3 h-3 text-blue-200" /> 
-                        <div className="flex flex-col items-start leading-none">
-                            <span className="text-[7px] font-bold text-blue-200 uppercase">Coming</span>
-                            <span className="text-[8px] font-black uppercase">Soon</span>
-                        </div>
-                    </div>
-                </div>
-            );
-
-        default:
-            return null;
-    }
 };
 
 // --- DATA FAQ ---
@@ -291,12 +159,7 @@ const faqData = [
         answer: (
             <>
                 Kami menyarankan Anda untuk bergabung ke{" "}
-                <a 
-                    href="https://chat.whatsapp.com/FhPdtrbBbYY6R6J9afilfC" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-[#FF9E9E] font-bold hover:underline"
-                >
+                <a href="https://chat.whatsapp.com/FhPdtrbBbYY6R6J9afilfC" target="_blank" rel="noopener noreferrer" className="text-[#FF9E9E] font-bold hover:underline">
                     WhatsApp Group Akinarabook
                 </a>. 
                 Informasi pembukaan dan penutupan PO, promo, flash sale, serta koleksi buku terbaru biasanya dibagikan lebih awal melalui grup tersebut.
@@ -309,19 +172,12 @@ const faqData = [
     }
 ];
 
-// --- COMPONENT: PO INFO BANNER (REFINED: BALANCED COLORS) ---
+// --- COMPONENT: PO INFO BANNER ---
 const POInfoBanner = () => {
-    const [showRules, setShowRules] = useState(false);
     const [daysLeft, setDaysLeft] = useState(0);
     const [isExpired, setIsExpired] = useState(false);
-
-    // Tanggal Penutupan PO
-    const TARGET_DATE_STR = '2026-01-20T23:59:59'; // 20 Januari 2026, 23:59:59 WIB
-
-    const formattedDate = new Date(TARGET_DATE_STR).toLocaleDateString('id-ID', {
-        day: 'numeric',
-        month: 'short'
-    });
+    const TARGET_DATE_STR = '2026-01-20T23:59:59'; 
+    const formattedDate = new Date(TARGET_DATE_STR).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
 
     useEffect(() => {
         const targetDate = new Date(TARGET_DATE_STR).getTime();
@@ -339,61 +195,40 @@ const POInfoBanner = () => {
     }, []);
 
     const waitlistLink = "https://wa.me/6282314336969?text=Halo%20Admin%20Akinara%2C%20saya%20terlambat%20ikut%20PO%20Flying%20Eye%20Books.%20Apakah%20masih%20bisa%20pesan%20atau%20saya%20boleh%20gabung%20Waitlist%20jika%20ada%20slot%20sisa%3F";
-    const askLink = "https://wa.me/6282314336969?text=Halo%20Akinara%21%20Saya%20ingin%20tanya%20dan%20pesan%20buku%20PO%20Flying%20Eye%20Books...";
-
+    
     return (
         <div className="bg-[#FFF9F0] py-8 border-b border-orange-100 font-sans relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-                {/* Background Decoration: Tetap Warm agar menyatu dengan website */}
                 <div className={`absolute top-[-50%] left-[-10%] w-96 h-96 rounded-full blur-3xl animate-pulse ${isExpired ? 'bg-orange-100/30' : 'bg-orange-200/20'}`}></div>
                 <div className="absolute bottom-[-50%] right-[-10%] w-96 h-96 bg-yellow-200/20 rounded-full blur-3xl animate-pulse delay-700"></div>
             </div>
 
             <div className="max-w-4xl mx-auto px-4 relative z-10">
                 <div className={`group backdrop-blur-sm rounded-[2rem] p-6 md:p-8 shadow-lg border transition-all duration-500 ease-out hover:-translate-y-1 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden ${isExpired ? 'bg-white/60 border-slate-200' : 'bg-white/80 border-orange-100 hover:shadow-[0_20px_40px_-15px_rgba(255,158,158,0.3)] hover:border-orange-300'}`}>
-                    
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-[200%] group-hover:translate-x-[200%] transition-transform duration-1000 ease-in-out pointer-events-none rounded-[2rem]"></div>
-
                     <div className="flex-1 relative z-10 text-center md:text-left">
-                        
-                        {/* --- STATUS BADGE (Pembeda Utama) --- */}
                         <div className="flex items-center justify-center md:justify-start gap-3 mb-3">
                             {isExpired ? (
-                                // BADGE: BIRU (Closed)
                                 <span className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-[10px] font-black uppercase tracking-widest border border-blue-200 shadow-sm">
-                                    <span className="relative flex h-2 w-2">
-                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
-                                    </span>
-                                    Order Submitted
+                                    <span className="relative flex h-2 w-2"><span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span></span> Order Submitted
                                 </span>
                             ) : (
-                                // BADGE: HIJAU (Ongoing)
                                 <span className="flex items-center gap-1.5 px-3 py-1 bg-green-50 text-green-700 rounded-full text-[10px] font-black uppercase tracking-widest border border-green-200 shadow-sm group-hover:bg-green-100 transition-colors">
-                                    <span className="relative flex h-2 w-2">
-                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                                    </span>
-                                    Ongoing Batch
+                                    <span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span></span> Ongoing Batch
                                 </span>
                             )}
-                            
                             {!isExpired && daysLeft > 0 && (
                                 <span className="flex items-center gap-1.5 px-3 py-1 bg-red-50 text-red-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-red-200 shadow-sm group-hover:bg-red-100 transition-colors">
                                     <Clock className="w-3 h-3 animate-pulse"/> {daysLeft} Hari Lagi
                                 </span>
                             )}
                         </div>
-
-                        {/* --- HEADLINE (KEMBALI KE COKLAT AGAR JELAS) --- */}
                         <h3 className="text-2xl md:text-3xl font-black text-[#8B5E3C] leading-tight tracking-wide mb-2">
                             {isExpired ? "Batch Closed: " : "Open PO: "}
-                            {/* Gradient teks hanya pada nama Brand agar tetap pop-up */}
                             <span className={`text-transparent bg-clip-text bg-gradient-to-r ${isExpired ? 'from-[#8B5E3C] to-[#6D4C41]' : 'from-[#FF9E9E] to-[#FF7043] group-hover:to-[#FF5722]'} transition-all`}>
                                 Flying Eye Books
                             </span>
                         </h3>
-                        
-                        {/* --- INFO ETA --- */}
                         <div className="flex flex-wrap justify-center md:justify-start gap-4 text-xs md:text-sm text-[#6D4C41] font-bold opacity-80 group-hover:opacity-100 transition-opacity">
                             {!isExpired && (
                                 <div className="flex items-center gap-2 bg-orange-50/50 px-3 py-1.5 rounded-lg border border-orange-100/50">
@@ -401,111 +236,24 @@ const POInfoBanner = () => {
                                     <span>Tutup: <strong className="text-[#8B5E3C]">{formattedDate}</strong></span>
                                 </div>
                             )}
-                            {/* Ikon Truk/ETA ikut berubah biru jika expired agar ada 'hint' status, tapi teks tetap coklat */}
                             <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${isExpired ? 'bg-blue-50/50 border-blue-100/50' : 'bg-orange-50/50 border-orange-100/50'}`}>
                                 <Truck className={`w-4 h-4 ${isExpired ? 'text-blue-400' : 'text-orange-400'}`}/> 
                                 <span>ETA Indo: <strong className="text-[#8B5E3C]">Mei-Juni 2026</strong></span>
                             </div>
                         </div>
                     </div>
-                    
-                    {/* --- TOMBOL --- */}
-                    {isExpired ? (
-                        // TOMBOL WAITLIST (Slate/Netral)
-                        <a 
-                            href={waitlistLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="relative overflow-hidden w-full md:w-auto px-8 py-4 bg-slate-600 text-white rounded-2xl font-black text-xs tracking-widest hover:bg-slate-700 transition-all shadow-md active:scale-95 flex items-center justify-center gap-2"
-                        >
-                            <span className="relative z-10 flex items-center gap-2">
-                                <Bookmark className="w-4 h-4" /> GABUNG WAITLIST
-                            </span>
+                    {isExpired && (
+                        <a href={waitlistLink} target="_blank" rel="noopener noreferrer" className="relative overflow-hidden w-full md:w-auto px-8 py-4 bg-slate-600 text-white rounded-2xl font-black text-xs tracking-widest hover:bg-slate-700 transition-all shadow-md active:scale-95 flex items-center justify-center gap-2">
+                            <span className="relative z-10 flex items-center gap-2"><Bookmark className="w-4 h-4" /> GABUNG WAITLIST</span>
                         </a>
-                    ) : (
-                        // TOMBOL UTAMA (Hijau/Aktif)
-                        <button 
-                            onClick={() => setShowRules(true)}
-                            className="relative overflow-hidden w-full md:w-auto px-8 py-4 bg-[#8B5E3C] text-white rounded-2xl font-black text-xs tracking-widest hover:bg-[#6D4C41] transition-all shadow-md active:scale-95 group-hover:shadow-orange-200 group-hover:shadow-lg flex items-center justify-center gap-2"
-                        >
-                            <span className="relative z-10 flex items-center gap-2">
-                                <Info className="w-4 h-4" /> CARA ORDER
-                            </span>
-                        </button>
                     )}
                 </div>
             </div>
-
-            {/* MODAL RULES (Isi konten modal tetap sama seperti sebelumnya) */}
-            {showRules && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[#8B5E3C]/20 backdrop-blur-md animate-fade-in text-sm">
-                    <div className="absolute inset-0" onClick={() => setShowRules(false)}></div>
-                    <div className="relative bg-white rounded-[3rem] shadow-2xl max-w-xl w-full p-8 md:p-12 animate-scale-up max-h-[90vh] overflow-y-auto">
-                        <button onClick={() => setShowRules(false)} className="absolute top-8 right-8 text-gray-300 hover:text-red-500 transition-colors">
-                            <X className="w-6 h-6"/>
-                        </button>
-                        <div className="text-center mb-10">
-                            <h3 className="text-2xl font-black text-[#8B5E3C] uppercase tracking-tighter">Order Journey</h3>
-                            <p className="text-orange-400 font-bold text-xs uppercase tracking-widest mt-1">Langkah mudah pesan buku impianmu</p>
-                        </div>
-                        <div className="space-y-8 relative before:absolute before:left-[15px] before:top-2 before:bottom-2 before:w-0.5 before:bg-orange-100">
-                            {/* Step 1 */}
-                            <div className="relative pl-12">
-                                <span className="absolute left-0 top-0 w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center text-[#8B5E3C] font-black text-xs z-10 border-4 border-white shadow-sm">1</span>
-                                <p className="font-black text-[#8B5E3C] text-base">Pilih Buku & Masukkan Keranjang</p>
-                                <p className="text-slate-500 leading-relaxed mt-1">Pilih koleksi Flying Eye Books di katalog, lalu masukkan ke keranjang belanja.</p>
-                            </div>
-                            {/* Step 2 */}
-                            <div className="relative pl-12">
-                                <span className="absolute left-0 top-0 w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center text-[#8B5E3C] font-black text-xs z-10 border-4 border-white shadow-sm">2</span>
-                                <p className="font-black text-[#8B5E3C] text-base">Checkout via WhatsApp</p>
-                                <p className="text-slate-500 leading-relaxed mt-1">Klik tombol checkout di keranjang, kirim pesan otomatis ke Admin untuk konfirmasi pesanan & ongkir.</p>
-                            </div>
-                            {/* Step 3 */}
-                            <div className="relative pl-12">
-                                <span className="absolute left-0 top-0 w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center text-white font-black text-xs z-10 border-4 border-white shadow-sm animate-pulse">3</span>
-                                <p className="font-black text-orange-600 text-base">Submit & Pembayaran DP</p>
-                                <p className="text-slate-600 font-bold leading-relaxed mt-1 bg-orange-50 p-3 rounded-xl border border-orange-100">
-                                    Pembayaran DP 25% dilakukan SETELAH kami men-submit orderan ke importir (H+7 setelah PO ditutup).
-                                </p>
-                            </div>
-                            {/* Step 4 */}
-                            <div className="relative pl-12">
-                                <span className="absolute left-0 top-0 w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center text-[#8B5E3C] font-black text-xs z-10 border-4 border-white shadow-sm">4</span>
-                                <p className="font-black text-[#8B5E3C] text-base">Pelunasan</p>
-                                <p className="text-slate-500 leading-relaxed mt-1">Saat buku mendarat di gudang Jakarta, invoice pelunasan dikirim.</p>
-                            </div>
-                            {/* Step 5 */}
-                            <div className="relative pl-12">
-                                <span className="absolute left-0 top-0 w-8 h-8 bg-[#FF9E9E] rounded-full flex items-center justify-center text-white font-black text-xs z-10 border-4 border-white shadow-sm">5</span>
-                                <p className="font-black text-[#8B5E3C] text-base">Siap Meluncur!</p>
-                                <p className="text-slate-500 leading-relaxed mt-1">Buku dikemas aman dan dikirim ke alamatmu.</p>
-                            </div>
-                        </div>
-                        <div className="mt-8 space-y-3">
-                            <a 
-                                href={askLink}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="w-full py-3 bg-[#25D366] hover:bg-[#1ebd5a] text-white rounded-xl font-bold text-sm shadow-md flex items-center justify-center gap-2 transition-all active:scale-95"
-                            >
-                                <MessageCircle className="w-5 h-5" /> CHAT ADMIN VIA WA
-                            </a>
-                            <button 
-                                onClick={() => setShowRules(false)}
-                                className="w-full py-2 text-slate-400 font-bold uppercase tracking-widest text-[10px] hover:text-[#8B5E3C] transition-colors"
-                            >
-                                Tutup Panduan
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };
 
-// --- COMPONENT: NAVBAR (UPDATED: WITH CART) ---
+// --- COMPONENT: NAVBAR ---
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const { getCartCount, setIsCartOpen } = useCart();
@@ -525,11 +273,7 @@ const Navbar = () => {
             <a href="#faq" className="text-[#8B5E3C] font-medium hover:text-[#FF9E9E] transition-colors hover:-translate-y-0.5 transform duration-200">FAQ</a>
             <a href="#tentang" className="text-[#8B5E3C] font-medium hover:text-[#FF9E9E] transition-colors hover:-translate-y-0.5 transform duration-200">Tentang Kami</a>
             
-            {/* CART BUTTON */}
-            <button 
-                onClick={() => setIsCartOpen(true)}
-                className="relative p-2 text-[#8B5E3C] hover:text-[#FF9E9E] transition-colors"
-            >
+            <button onClick={() => setIsCartOpen(true)} className="relative p-2 text-[#8B5E3C] hover:text-[#FF9E9E] transition-colors">
                 <ShoppingCart className="w-6 h-6" />
                 {getCartCount() > 0 && (
                     <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
@@ -543,16 +287,9 @@ const Navbar = () => {
             </a>
           </div>
           <div className="md:hidden flex items-center gap-4">
-            <button 
-                onClick={() => setIsCartOpen(true)}
-                className="relative p-2 text-[#8B5E3C]"
-            >
+            <button onClick={() => setIsCartOpen(true)} className="relative p-2 text-[#8B5E3C]">
                 <ShoppingCart className="w-6 h-6" />
-                {getCartCount() > 0 && (
-                    <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
-                        {getCartCount()}
-                    </span>
-                )}
+                {getCartCount() > 0 && <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">{getCartCount()}</span>}
             </button>
             <button onClick={() => setIsOpen(!isOpen)} className="text-[#8B5E3C]">{isOpen ? <X /> : <Menu />}</button>
           </div>
@@ -605,10 +342,10 @@ const Hero = () => {
         </Reveal>
         
         <Reveal delay={400}>
-    <p className="text-lg md:text-xl text-[#6D4C41] mb-0 max-w-4xl mx-auto leading-relaxed">
-        Explore our handpicked collection of extraordinary books, chosen to be the perfect companions for your little explorer’s first steps into the magic of reading.
-    </p>
-</Reveal>
+            <p className="text-lg md:text-xl text-[#6D4C41] mb-0 max-w-4xl mx-auto leading-relaxed">
+                Explore our handpicked collection of extraordinary books, chosen to be the perfect companions for your little explorer’s first steps into the magic of reading.
+            </p>
+        </Reveal>
       </div>
     </section>
   );
@@ -638,220 +375,6 @@ const Features = () => {
           ))}
         </div>
       </div>
-    </section>
-  );
-};
-
-// --- COMPONENT: CATALOG PREVIEW (UPDATED WITH CART LOGIC & BACKLIST CHECK) ---
-const CatalogPreview = () => {
-  const [selectedBook, setSelectedBook] = useState<any>(null);
-  const [highlightBooks, setHighlightBooks] = useState<any[]>([]); 
-  const [loading, setLoading] = useState(true); 
-  const closeModal = () => setSelectedBook(null);
-  const { addToCart } = useCart(); 
-
-  useEffect(() => {
-    async function fetchHighlights() {
-      const { data, error } = await supabase
-        .from('books')
-        .select('*')
-        .eq('is_highlight', true)
-        .limit(4); 
-
-      if (error) {
-        console.error("Error fetching highlights:", error);
-      } else {
-        setHighlightBooks(data || []);
-      }
-      setLoading(false);
-    }
-
-    fetchHighlights();
-  }, []);
-
-  return (
-    <section className="py-20 bg-linear-to-b from-white to-[#FFF9F0]" id="katalog">
-      <div className="max-w-7xl mx-auto px-4 text-center">
-        <div className="flex flex-col items-center gap-3 mb-12">
-            <Reveal><span className="inline-block px-4 py-1.5 bg-[#FF9E9E] text-white rounded-full text-sm font-bold tracking-wide shadow-sm mb-2">KOLEKSI TERBAIK</span></Reveal>
-            <Reveal delay={200}><h2 className="text-3xl md:text-5xl font-extrabold text-[#8B5E3C] mb-2">Buku Pilihan Untuk Si Kecil</h2></Reveal>
-            <Reveal delay={300}><p className="text-[#6D4C41] text-sm md:text-base font-medium max-w-4xl mx-auto">Jelajahi koleksi buku anak terbaik kami yang penuh warna dan cerita menarik</p></Reveal>
-        </div>
-        
-        {loading ? (
-             <div className="text-center py-20">
-                <div className="inline-block w-8 h-8 border-4 border-orange-200 border-t-[#8B5E3C] rounded-full animate-spin mb-2"></div>
-                <p className="text-[#8B5E3C]">Memuat rekomendasi...</p>
-             </div>
-        ) : highlightBooks.length === 0 ? (
-            <div className="text-center py-10 border border-dashed border-orange-200 rounded-3xl">
-                <p className="text-gray-400">Belum ada buku yang di-highlight.</p>
-            </div>
-        ) : (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
-            {highlightBooks.map((book, idx) => (
-                <Reveal key={book.id} delay={idx * 150}>
-                    <div onClick={() => setSelectedBook(book)} className="group relative bg-white p-3 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-2 cursor-pointer h-full flex flex-col border border-transparent hover:border-orange-100">
-                        
-                        {book.sticker_text && (
-                            <StickerBadge type={book.sticker_text} />
-                        )}
-
-                        <div className="aspect-3/4 rounded-xl overflow-hidden mb-4 relative bg-gray-100">
-                            <img src={book.image} alt={book.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                            
-                            {/* STATUS BADGE */}
-                            <div className="absolute top-2 right-2">
-                                {book.status === 'READY' ? (
-                                    <span className="bg-green-500 text-white text-[10px] px-2 py-1 rounded-full font-bold shadow-md flex items-center gap-1">
-                                        <Truck className="w-3 h-3" /> READY
-                                    </span>
-                                ) : book.status === 'PO' ? (
-                                    <span className="bg-blue-500 text-white text-[10px] px-2 py-1 rounded-full font-bold shadow-md flex items-center gap-1">
-                                        <Clock className="w-3 h-3" /> PO
-                                    </span>
-                                ) : (
-                                    <span className="bg-slate-500 text-white text-[10px] px-2 py-1 rounded-full font-bold shadow-md flex items-center gap-1">
-                                        <Bookmark className="w-3 h-3" /> BACKLIST
-                                    </span>
-                                )}
-                            </div>
-
-                            <div className="absolute top-2 left-2 flex flex-col gap-1">
-                                <span className="bg-white/90 text-[10px] px-2 py-0.5 rounded-full font-bold text-[#8B5E3C] shadow-sm">{book.type}</span>
-                                <span className="bg-[#FF9E9E]/90 text-[10px] px-2 py-0.5 rounded-full font-bold text-white shadow-sm">{book.age}</span>
-                            </div>
-                            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                <span className="bg-white/90 text-[#8B5E3C] px-3 py-1 rounded-full text-xs font-bold transform scale-90 group-hover:scale-100 transition-transform">Lihat Detail</span>
-                            </div>
-                        </div>
-                        <h3 className="font-bold text-[#8B5E3C] mb-1 line-clamp-1 text-left">{book.title}</h3>
-                        <p className="text-[#FF9E9E] font-bold text-lg text-left">Rp {book.price.toLocaleString('id-ID')}</p>
-                    </div>
-                </Reveal>
-            ))}
-            </div>
-        )}
-
-        <Reveal delay={400}>
-            <div className="mt-12">
-            <a href="/katalog" className="inline-flex items-center gap-2 bg-[#8B5E3C] text-white px-8 py-3 rounded-full font-bold hover:bg-[#6D4C41] transition-all shadow-lg hover:shadow-orange-200 hover:scale-105">
-                Lihat Koleksi Lengkap <ArrowRight className="w-4 h-4" />
-            </a>
-            </div>
-        </Reveal>
-      </div>
-
-      {/* MODAL POPUP */}
-      {selectedBook && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-            <div className="absolute inset-0" onClick={closeModal}></div>
-            <div className="relative bg-white rounded-3xl shadow-2xl max-w-6xl w-full overflow-hidden flex flex-col md:flex-row animate-scale-up max-h-[90vh]">
-                <button onClick={closeModal} className="absolute top-4 right-4 z-10 p-2 bg-white/80 rounded-full hover:bg-white text-gray-500 hover:text-red-500 transition-colors shadow-sm"><X className="w-6 h-6" /></button>
-                <div className="w-full md:w-1/2 bg-gray-50 flex items-center justify-center p-6 md:p-8">
-                    <img src={selectedBook.image} alt={selectedBook.title} className="max-w-full max-h-75 md:max-h-125 object-contain rounded-lg shadow-md" />
-                </div>
-                
-                <div className="w-full md:w-1/2 p-6 md:p-10 flex flex-col text-left overflow-y-auto">
-                    <div className="flex gap-2 mb-3">
-                        {selectedBook.status === 'READY' ? (
-                            <span className="inline-block px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full">READY STOCK</span>
-                        ) : selectedBook.status === 'PO' ? (
-                            <span className="inline-block px-3 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded-full">PRE-ORDER</span>
-                        ) : (
-                            <span className="inline-block px-3 py-1 bg-slate-100 text-slate-700 text-xs font-bold rounded-full">BACKLIST</span>
-                        )}
-                        <span className="inline-block px-3 py-1 bg-orange-100 text-[#8B5E3C] text-xs font-bold rounded-full">{selectedBook.type}</span>
-                        <span className="inline-block px-3 py-1 bg-[#FF9E9E] text-white text-xs font-bold rounded-full">{selectedBook.age}</span>
-                    </div>
-                    
-                    <h3 className="text-2xl md:text-4xl font-bold text-[#8B5E3C] mb-2 leading-tight">{selectedBook.title}</h3>
-                    <p className="text-3xl font-bold text-[#FF9E9E] mb-6">Rp {selectedBook.price.toLocaleString('id-ID')}</p>
-                    
-                    <div className="bg-slate-50 p-4 rounded-xl mb-6 text-sm text-slate-700 border border-slate-100">
-                        <div className="flex justify-between mb-1">
-                            <span>Status:</span>
-                            <span className="font-bold">
-                                {selectedBook.status === 'READY' ? 'Tersedia' : 
-                                 selectedBook.status === 'PO' ? 'Pre-Order' : 'Backlist / Archive'}
-                            </span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span>Estimasi Tiba:</span>
-                            <span className="font-bold text-[#8B5E3C]">{selectedBook.eta || 'Hubungi Admin'}</span>
-                        </div>
-                    </div>
-
-                    <div className="space-y-3 mb-6 text-sm text-slate-600">
-                        <div className="flex items-center gap-2"><User className="w-4 h-4 text-orange-300" /><span>Penulis: {selectedBook.author}</span></div>
-                        <div className="flex items-center gap-2"><Building2 className="w-4 h-4 text-orange-300" /><span>Penerbit: {selectedBook.publisher}</span></div>
-                        <div className="flex items-center gap-2"><BookIcon className="w-4 h-4 text-orange-300" /><span>Spesifikasi: {selectedBook.pages}</span></div>
-                        <div className="flex items-start gap-2"><Globe className="w-4 h-4 text-orange-300 mt-1" /><span>{selectedBook.desc || selectedBook.description}</span></div>
-                    </div>
-
-                    {selectedBook.previewurl && (
-                        <div className="mb-6">
-                            <h4 className="font-bold text-[#8B5E3C] mb-2 flex items-center gap-2">
-                                <Eye className="w-4 h-4" /> Preview Buku
-                            </h4>
-                            {isEmbeddable(selectedBook.previewurl) ? (
-                                <>
-                                    <div className={`relative w-full rounded-xl overflow-hidden shadow-sm border border-orange-100 ${selectedBook.previewurl.includes('instagram') ? 'h-137.5' : 'aspect-video'}`}>
-                                        <iframe className="absolute inset-0 w-full h-full" src={getEmbedUrl(selectedBook.previewurl) as string} title="Review Preview" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
-                                    </div>
-                                    <a href={selectedBook.previewurl} target="_blank" className="text-xs text-orange-400 hover:text-orange-600 mt-1 inline-block underline">Buka di aplikasi</a>
-                                </>
-                            ) : (
-                                <a 
-                                    href={selectedBook.previewurl} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer"
-                                    className="flex items-center justify-between p-4 bg-orange-50 hover:bg-orange-100 border border-orange-200 rounded-xl transition-all group"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className="bg-white p-2 rounded-lg shadow-sm">
-                                            <BookIcon className="w-6 h-6 text-[#8B5E3C]" />
-                                        </div>
-                                        <div>
-                                            <p className="font-bold text-[#8B5E3C] text-sm">Lihat Isi Buku (Look Inside)</p>
-                                            <p className="text-xs text-orange-400">Preview tersedia di website eksternal</p>
-                                        </div>
-                                    </div>
-                                    <ArrowRight className="w-5 h-5 text-[#8B5E3C] transform group-hover:translate-x-1 transition-transform" />
-                                </a>
-                            )}
-                        </div>
-                    )}
-
-                    <div className="flex gap-3 mt-auto pt-4">
-                         {/* TOMBOL LOGIKA PINTAR (Backlist vs Cart) */}
-                         {selectedBook.status === 'BACKLIST' || selectedBook.status === 'REFERENSI' || selectedBook.status === 'ARCHIVE' ? (
-                            <a 
-                                href={getWaLink(selectedBook)} 
-                                target="_blank" 
-                                className="flex-1 text-white py-3 rounded-xl font-bold text-center hover:bg-slate-600 transition-colors flex items-center justify-center gap-2 shadow-md hover:shadow-lg bg-slate-500"
-                            >
-                                <MessageCircle className="w-5 h-5" /> 
-                                Tanya Jadwal PO
-                            </a>
-                         ) : (
-                            <button 
-                                onClick={() => {
-                                    addToCart(selectedBook);
-                                    closeModal(); 
-                                }} 
-                                className="flex-1 text-white py-3 rounded-xl font-bold text-center hover:bg-[#6D4C41] transition-colors flex items-center justify-center gap-2 shadow-md hover:shadow-lg bg-[#8B5E3C]"
-                            >
-                                <ShoppingBag className="w-5 h-5" /> 
-                                Tambah ke Keranjang
-                            </button>
-                         )}
-                    </div>
-                </div>
-            </div>
-        </div>
-      )}
-      <CartDrawer /> {/* JANGAN LUPA: CART DRAWER DI RENDER DI SINI */}
     </section>
   );
 };
@@ -936,7 +459,10 @@ export default function AkinaraLanding() {
       <Hero />
       <POInfoBanner />
       <Features />
-      <CatalogPreview />
+      
+      {/* INI DIA PERUBAHAN UTAMANYA: CUKUP PANGGIL 1 BARIS */}
+      <MiniCatalog />
+      
       <FAQSection /> 
       <Footer />
       <CartDrawer />

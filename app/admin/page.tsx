@@ -412,6 +412,29 @@ export default function AdminPage() {
       </div>
     );
   }
+// --- LOGIKA VALIDASI MAX 4 HIGHLIGHT ---
+  const handleHighlightChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const isTurningOn = e.target.checked;
+
+    if (isTurningOn) {
+      // 1. Hitung jumlah highlight yang aktif di database saat ini
+      const currentHighlightsCount = books.filter(b => b.is_highlight).length;
+
+      // 2. Cek apakah buku yang sedang diedit ini SUDAH highlight sebelumnya?
+      // (Supaya kalau kita edit buku yang memang sudah highlight, tidak kena blokir)
+      const isAlreadyActive = books.find(b => b.id === formData.id)?.is_highlight;
+
+      // 3. JIKA belum aktif DAN slot sudah penuh (>= 4)
+      if (!isAlreadyActive && currentHighlightsCount >= 4) {
+        alert("⚠️ BATAS MAKSIMAL TERCAPAI!\n\nSudah ada 4 buku yang di-highlight di Homepage.\n\nDemi estetika website, mohon 'uncheck' salah satu buku highlight yang lama terlebih dahulu.");
+        return; // STOP! Jangan update state (tetap unchecked)
+      }
+    }
+
+    // Jika aman, lanjutkan perubahan
+    setFormData({ ...formData, is_highlight: isTurningOn });
+  };
+// ... (Pastikan fungsi handleHighlightChange sudah ditaruh di atas return)
 
   return (
     <div className="min-h-screen bg-[#FFF9F0] text-[#6D4C41] font-sans pb-20 overflow-x-hidden text-sm">
@@ -680,7 +703,7 @@ export default function AdminPage() {
                             type="checkbox" 
                             id="isHighlight"
                             checked={formData.is_highlight || false} 
-                            onChange={(e) => setFormData({...formData, is_highlight: e.target.checked})} 
+                            onChange={handleHighlightChange} // <-- PANGGIL FUNGSI BARU DI SINI
                             className="w-6 h-6 text-[#8B5E3C] rounded focus:ring-orange-500 border-gray-300 cursor-pointer accent-[#8B5E3C]" 
                         />
                         <label htmlFor="isHighlight" className="cursor-pointer">
