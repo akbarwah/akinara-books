@@ -172,29 +172,78 @@ const faqData = [
     }
 ];
 
-// --- COMPONENT: PO INFO BANNER ---
+// --- COMPONENT: PO INFO BANNER (DYNAMIC FROM SUPABASE) ---
 const POInfoBanner = () => {
     const [daysLeft, setDaysLeft] = useState(0);
     const [isExpired, setIsExpired] = useState(false);
-    const TARGET_DATE_STR = '2026-01-20T23:59:59'; 
-    const formattedDate = new Date(TARGET_DATE_STR).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+    
+    // State baru untuk menampung data dari Supabase
+    const [bannerData, setBannerData] = useState<any>(null);
+    const [isLoading, setIsLoading] = useState(true);
 
+// Fetch data banner aktif dari database
     useEffect(() => {
-        const targetDate = new Date(TARGET_DATE_STR).getTime();
-        const now = new Date().getTime();
-        const difference = targetDate - now;
-        
-        if (difference < 0) {
-            setIsExpired(true);
-            setDaysLeft(0);
-        } else {
-            setIsExpired(false);
-            const days = Math.ceil(difference / (1000 * 60 * 60 * 24));
-            setDaysLeft(days);
-        }
+        const fetchActiveBanner = async () => {
+            setIsLoading(true);
+            try {
+                // KOREKSI: Gunakan .maybeSingle() alih-alih .single()
+                const { data, error } = await supabase
+                    .from('banner_config')
+                    .select('*')
+                    .eq('is_active', true)
+                    .maybeSingle(); 
+
+                if (error) {
+                    // KOREKSI: Gunakan console.warn alih-alih console.error 
+                    // agar tidak memicu layar overlay error merah di Next.js Dev
+                    console.warn("Peringatan dari Supabase:", error.message);
+                } else {
+                    setBannerData(data); // Jika tidak ada yg aktif, data otomatis berisi null
+                }
+            } catch (err) {
+                console.warn("Gagal menarik data banner:", err);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchActiveBanner();
     }, []);
 
-    const waitlistLink = "https://wa.me/6282314336969?text=Halo%20Admin%20Akinara%2C%20saya%20terlambat%20ikut%20PO%20Flying%20Eye%20Books.%20Apakah%20masih%20bisa%20pesan%20atau%20saya%20boleh%20gabung%20Waitlist%20jika%20ada%20slot%20sisa%3F";
+    // Logika Countdown Timer (Hanya berjalan jika bannerData tersedia)
+    useEffect(() => {
+        if (!bannerData || !bannerData.target_date) return;
+
+        const targetDateStr = bannerData.target_date;
+        const targetDate = new Date(targetDateStr).getTime();
+        
+        const updateTimer = () => {
+            const now = new Date().getTime();
+            const difference = targetDate - now;
+            
+            if (difference < 0) {
+                setIsExpired(true);
+                setDaysLeft(0);
+            } else {
+                setIsExpired(false);
+                setDaysLeft(Math.ceil(difference / (1000 * 60 * 60 * 24)));
+            }
+        };
+
+        updateTimer();
+        
+        // Opsional: Jika Anda ingin angkanya berkurang realtime saat pergantian hari 
+        // tanpa harus refresh browser.
+        const interval = setInterval(updateTimer, 60000); 
+        return () => clearInterval(interval);
+
+    }, [bannerData]);
+
+    // Jika sedang loading, atau jika admin tidak mengaktifkan banner apapun,
+    // maka jangan tampilkan banner ini sama sekali di landing page.
+    if (isLoading || !bannerData) return null;
+
+    const formattedDate = new Date(bannerData.target_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
     
     return (
         <div className="bg-[#FFF9F0] py-8 border-b border-orange-100 font-sans relative overflow-hidden">
@@ -226,7 +275,8 @@ const POInfoBanner = () => {
                         <h3 className="text-2xl md:text-3xl font-black text-[#8B5E3C] leading-tight tracking-wide mb-2">
                             {isExpired ? "Batch Closed: " : "Open PO: "}
                             <span className={`text-transparent bg-clip-text bg-gradient-to-r ${isExpired ? 'from-[#8B5E3C] to-[#6D4C41]' : 'from-[#FF9E9E] to-[#FF7043] group-hover:to-[#FF5722]'} transition-all`}>
-                                Flying Eye Books
+                                {/* Nama Penerbit diambil dari Database */}
+                                {bannerData.publisher_name} 
                             </span>
                         </h3>
                         <div className="flex flex-wrap justify-center md:justify-start gap-4 text-xs md:text-sm text-[#6D4C41] font-bold opacity-80 group-hover:opacity-100 transition-opacity">
@@ -238,12 +288,13 @@ const POInfoBanner = () => {
                             )}
                             <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${isExpired ? 'bg-blue-50/50 border-blue-100/50' : 'bg-orange-50/50 border-orange-100/50'}`}>
                                 <Truck className={`w-4 h-4 ${isExpired ? 'text-blue-400' : 'text-orange-400'}`}/> 
-                                <span>ETA Indo: <strong className="text-[#8B5E3C]">Mei-Juni 2026</strong></span>
+                                {/* ETA diambil dari Database */}
+                                <span>ETA Indo: <strong className="text-[#8B5E3C]">{bannerData.eta_text}</strong></span>
                             </div>
                         </div>
                     </div>
-                    {isExpired && (
-                        <a href={waitlistLink} target="_blank" rel="noopener noreferrer" className="relative overflow-hidden w-full md:w-auto px-8 py-4 bg-slate-600 text-white rounded-2xl font-black text-xs tracking-widest hover:bg-slate-700 transition-all shadow-md active:scale-95 flex items-center justify-center gap-2">
+                    {isExpired && bannerData.waitlist_link && (
+                        <a href={bannerData.waitlist_link} target="_blank" rel="noopener noreferrer" className="relative overflow-hidden w-full md:w-auto px-8 py-4 bg-slate-600 text-white rounded-2xl font-black text-xs tracking-widest hover:bg-slate-700 transition-all shadow-md active:scale-95 flex items-center justify-center gap-2">
                             <span className="relative z-10 flex items-center gap-2"><Bookmark className="w-4 h-4" /> GABUNG WAITLIST</span>
                         </a>
                     )}
