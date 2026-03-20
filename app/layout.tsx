@@ -110,7 +110,7 @@ export default function RootLayout({
         </CartProvider>
         <Analytics />
         <SpeedInsights />
-        <GoogleAnalytics gaId="G-XXXXXXXXXX" /> {/* ← isi setelah setup GA4 */}
+        <GoogleAnalytics gaId="G-7K589MS6C3" /> {/* ← isi setelah setup GA4 */}
       </body>
     </html>
   )
