@@ -1,35 +1,32 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, {
+  useState, useEffect, useMemo,
+  useRef, useCallback
+} from 'react';
 import { supabase } from '../../supabaseClient';
-import Papa from 'papaparse'; 
-import { 
-  ArrowLeft, Save, Plus, Edit, Trash2, 
-  Search, BookOpen as BookOpenIcon, X, Filter, AlertCircle, CheckCircle, ChevronDown, 
-  SortAsc, Tag, Hash, User, Building2, Calendar, Clock, Image as ImageIcon, FileText, Youtube, Globe, LogOut,
-  Layers, Baby, BookText, RefreshCcw, Download, Upload, Timer, Star, Sticker
+import Papa from 'papaparse';
+import {
+  ArrowLeft, Save, Plus, Edit, Trash2,
+  Search, BookOpen as BookOpenIcon, X, Filter,
+  AlertCircle, CheckCircle, ChevronDown,
+  Tag, Hash, User, Building2, Calendar,
+  Clock, Image as ImageIcon, Globe, LogOut,
+  Layers, Baby, BookText, RefreshCcw,
+  Download, Upload, Star, Loader2
 } from 'lucide-react';
+import { Sticker, Youtube } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-
-// === KOMPONEN BANNER MANAGER YANG DI-IMPORT ===
+import Reveal from '../components/Reveal';
 import BannerManager from './BannerManager';
+import { PLACEHOLDER_IMAGE } from '../components/helpers/bookHelpers';
 
-// --- 1. UTILITY COMPONENT ---
-const Reveal = ({ children, delay = 0, className = "" }: { children: React.ReactNode, delay?: number, className?: string }) => {
-  const [isVisible, setIsVisible] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const observer = new IntersectionObserver(([entry]) => { 
-      if (entry.isIntersecting) { setIsVisible(true); if (ref.current) observer.unobserve(ref.current); } 
-    }, { threshold: 0.1 });
-    if (ref.current) observer.observe(ref.current);
-    return () => { if (ref.current) observer.unobserve(ref.current); };
-  }, []);
-  return <div ref={ref} className={`transition-all duration-1000 ease-out transform ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'} ${className}`} style={{ transitionDelay: `${delay}ms` }}>{children}</div>;
-};
+// ============================================================
+// TIPE
+// ============================================================
+type BookStatus = 'READY' | 'PO' | 'BACKLIST';
 
-// --- 2. TIPE DATA ---
 type Book = {
   id?: number;
   title: string;
@@ -41,99 +38,175 @@ type Book = {
   publisher: string;
   author: string;
   pages: string;
-  desc?: string;        
-  description?: string; 
+  desc?: string;
+  description?: string;
   image: string;
   eta: string;
   previewurl: string;
-  is_highlight?: boolean; 
-  sticker_text?: string; 
+  is_highlight?: boolean;
+  sticker_text?: string;
 };
 
-// --- PILIHAN STICKER ---
-const STICKER_OPTIONS = ["NEW", "HOT", "SALE", "BEST SELLER", "COMING SOON"];
+// ============================================================
+// KONSTANTA
+// ============================================================
+const STICKER_OPTIONS = ['NEW', 'HOT', 'SALE', 'BEST SELLER', 'COMING SOON'];
+const FORMAT_OPTIONS = [
+  'Board Book', 'Hardback', 'Paperback',
+  'Lift-the-Flap', 'Picture Book', 'Interactive', 'Sound Book'
+];
+const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 menit
+const MAX_HIGHLIGHTS = 4;
 
-// --- 3. KOMPONEN UTAMA ---
+// Kolom wajib yang harus ada di CSV
+const REQUIRED_CSV_COLUMNS = ['title', 'price', 'status'];
+
+const INITIAL_FORM: Book = {
+  title: '', price: '', type: 'Board Book', age: '0-2 Thn',
+  status: 'READY', category: 'Impor', publisher: '', author: '',
+  pages: '', description: '', image: '', eta: 'Siap Kirim',
+  previewurl: '', is_highlight: false, sticker_text: '',
+};
+
+// ============================================================
+// TIPE NOTIFIKASI
+// ============================================================
+interface AppNotification {
+  type: 'success' | 'error';
+  text: string;
+}
+
+// ============================================================
+// KOMPONEN UTAMA
+// ============================================================
 export default function AdminPage() {
   const router = useRouter();
-  const [isChecking, setIsChecking] = useState(true); 
+  const [isChecking, setIsChecking] = useState(true);
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [msg, setMsg] = useState({ type: '', text: '' });
-  
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const INACTIVITY_LIMIT = 10 * 60 * 1000; 
+  const [isSaving, setIsSaving] = useState(false);
 
-  // --- LOGIKA SATPAM & AUTO LOGOUT ---
+  // ✅ FIX: Notifikasi inline, bukan alert()
+  const [notification, setNotification] = useState<AppNotification | null>(null);
+
+  // ✅ FIX: Konfirmasi delete inline, bukan confirm()
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ✅ Auto-dismiss notifikasi setelah 4 detik
+  useEffect(() => {
+    if (!notification) return;
+    const timer = setTimeout(() => setNotification(null), 4000);
+    return () => clearTimeout(timer);
+  }, [notification]);
+
+  // ✅ ESC untuk tutup modal
+  useEffect(() => {
+    if (!isModalOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsModalOpen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isModalOpen]);
+
+  // ✅ Kunci body scroll saat modal terbuka
+  useEffect(() => {
+    document.body.style.overflow = isModalOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [isModalOpen]);
+
+  // ============================================================
+  // AUTH & AUTO LOGOUT
+  // ============================================================
   useEffect(() => {
     let inactivityTimer: NodeJS.Timeout;
 
     const performLogout = async (reason: string) => {
       await supabase.auth.signOut();
-      localStorage.removeItem('admin_last_active'); 
-      alert(reason);
-      router.push('/login');
-    };
-
-    const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        router.push('/login');
-      } else {
-        const lastActive = localStorage.getItem('admin_last_active');
-        const now = Date.now();
-
-        if (lastActive && (now - parseInt(lastActive) > INACTIVITY_LIMIT)) {
-           await performLogout("Sesi Anda telah berakhir karena tidak ada aktivitas (Timeout). Silakan login kembali.");
-           return; 
-        }
-
-        localStorage.setItem('admin_last_active', now.toString());
-        setIsChecking(false);
-        fetchBooks();
-        startInactivityTimer(); 
-      }
+      localStorage.removeItem('admin_last_active');
+      // ✅ FIX: Tidak pakai alert(), set notification sebelum redirect
+      setNotification({ type: 'error', text: reason });
+      setTimeout(() => router.push('/login'), 1500);
     };
 
     const resetTimer = () => {
       if (inactivityTimer) clearTimeout(inactivityTimer);
       localStorage.setItem('admin_last_active', Date.now().toString());
       inactivityTimer = setTimeout(() => {
-        performLogout("Sesi Anda telah habis. Silakan login kembali.");
+        performLogout('Sesi habis karena tidak aktif. Redirecting...');
       }, INACTIVITY_LIMIT);
     };
 
-    const startInactivityTimer = () => {
-      window.addEventListener('mousemove', resetTimer);
-      window.addEventListener('click', resetTimer);
-      window.addEventListener('keypress', resetTimer);
-      window.addEventListener('scroll', resetTimer);
-      resetTimer(); 
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        router.push('/login');
+        return;
+      }
+
+      const lastActive = localStorage.getItem('admin_last_active');
+      const now = Date.now();
+
+      if (lastActive && now - parseInt(lastActive) > INACTIVITY_LIMIT) {
+        await performLogout('Sesi berakhir (timeout). Silakan login kembali.');
+        return;
+      }
+
+      localStorage.setItem('admin_last_active', now.toString());
+      setIsChecking(false);
+      fetchBooks();
+
+      // Pasang listener aktivitas
+      const events = ['mousemove', 'click', 'keypress', 'scroll'];
+      events.forEach((e) => window.addEventListener(e, resetTimer));
+      resetTimer();
     };
 
     checkUser();
 
     return () => {
       if (inactivityTimer) clearTimeout(inactivityTimer);
-      window.removeEventListener('mousemove', resetTimer);
-      window.removeEventListener('click', resetTimer);
-      window.removeEventListener('keypress', resetTimer);
-      window.removeEventListener('scroll', resetTimer);
+      const events = ['mousemove', 'click', 'keypress', 'scroll'];
+      events.forEach((e) => window.removeEventListener(e, resetTimer));
     };
   }, [router]);
 
-  // --- STATE FILTER & SORT ---
+  // ============================================================
+  // DATA
+  // ============================================================
+  const fetchBooks = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase.from('books').select('*');
+    if (error) {
+      setNotification({ type: 'error', text: 'Gagal memuat buku.' });
+    } else {
+      setBooks(data || []);
+    }
+    setLoading(false);
+  }, []);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    localStorage.removeItem('admin_last_active');
+    router.push('/login');
+  };
+
+  // ============================================================
+  // FILTER & SORT STATE
+  // ============================================================
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('Semua');
   const [filterCategory, setFilterCategory] = useState('Semua');
   const [filterAge, setFilterAge] = useState('Semua');
   const [filterPublisher, setFilterPublisher] = useState('Semua');
   const [filterType, setFilterType] = useState('Semua');
-  const [sortBy, setSortBy] = useState('terbaru'); 
+  const [sortBy, setSortBy] = useState('terbaru');
 
-  const handleResetFilter = () => {
+  const handleResetFilter = useCallback(() => {
     setSearchQuery('');
     setFilterStatus('Semua');
     setFilterCategory('Semua');
@@ -141,56 +214,43 @@ export default function AdminPage() {
     setFilterPublisher('Semua');
     setFilterType('Semua');
     setSortBy('terbaru');
-  };
+  }, []);
 
-  // --- STATE FORM ---
-  const initialForm: Book = {
-    title: '', price: '', type: 'Board Book', age: '0-2 Thn',
-    status: 'READY', category: 'Impor', publisher: '', author: '',
-    pages: '', description: '', image: '', eta: 'Siap Kirim', previewurl: '',
-    is_highlight: false,
-    sticker_text: '', 
-  };
-  const [formData, setFormData] = useState<Book>(initialForm);
+  // ============================================================
+  // FORM STATE
+  // ============================================================
+  const [formData, setFormData] = useState<Book>(INITIAL_FORM);
   const [isEditing, setIsEditing] = useState(false);
 
-  const formatOptions = ["Board Book", "Hardback", "Paperback", "Lift-the-Flap", "Picture Book", "Interactive", "Sound Book"];
-
-  async function fetchBooks() {
-    setLoading(true);
-    const { data, error } = await supabase.from('books').select('*');
-    if (!error) setBooks(data || []);
-    setLoading(false);
-  }
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    localStorage.removeItem('admin_last_active'); 
-    router.push('/login');
-  };
-
-  // --- FITUR EXPORT CSV ---
-  const handleExportCSV = () => {
+  // ============================================================
+  // EXPORT CSV
+  // ============================================================
+  const handleExportCSV = useCallback(() => {
     if (books.length === 0) {
-      alert("Tidak ada data untuk diexport");
+      setNotification({ type: 'error', text: 'Tidak ada data untuk diexport.' });
       return;
     }
     const csv = Papa.unparse(books.map(({ id, ...rest }) => rest));
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
+    const link = document.createElement('a');
     link.href = url;
-    link.setAttribute("download", `katalog-akinara-backup-${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute(
+      'download',
+      `katalog-akinara-${new Date().toISOString().split('T')[0]}.csv`
+    );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
+    URL.revokeObjectURL(url); // ✅ FIX: Revoke URL setelah dipakai
+    setNotification({ type: 'success', text: 'Export berhasil!' });
+  }, [books]);
 
-  // --- FITUR IMPORT CSV ---
+  // ============================================================
+  // IMPORT CSV
+  // ============================================================
   const handleImportClick = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
-    }
+    fileInputRef.current?.click();
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -202,128 +262,211 @@ export default function AdminPage() {
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
-      transformHeader: (header) => {
-        return header.trim().toLowerCase().replace(/^"|"$/g, '').replace(/[\uFEFF]/g, ""); 
-      },
-      complete: async (results) => {
-        const rawData = results.data as any[];
+      transformHeader: (header) =>
+        header.trim().toLowerCase()
+          .replace(/^"|"$/g, '')
+          .replace(/[\uFEFF]/g, ''),
 
-        const { data: existingBooks, error: fetchError } = await supabase
-          .from('books')
-          .select('id, title, type');
-        
-        if (fetchError) {
-          setMsg({ type: 'error', text: 'Gagal mengambil data lama.' });
+      complete: async (results) => {
+        const rawData = results.data as Record<string, string>[];
+
+        // ✅ FIX: Validasi kolom wajib ada di CSV
+        if (rawData.length === 0) {
+          setNotification({ type: 'error', text: 'File CSV kosong.' });
           setLoading(false);
           return;
         }
 
-        const dbMap = new Map();
-        existingBooks?.forEach(b => {
+        const csvColumns = Object.keys(rawData[0]);
+        const missingColumns = REQUIRED_CSV_COLUMNS.filter(
+          (col) => !csvColumns.includes(col)
+        );
+
+        if (missingColumns.length > 0) {
+          setNotification({
+            type: 'error',
+            text: `CSV tidak valid. Kolom wajib tidak ditemukan: ${missingColumns.join(', ')}`,
+          });
+          setLoading(false);
+          return;
+        }
+
+        // Fetch data existing untuk deteksi update vs insert
+        const { data: existingBooks, error: fetchError } = await supabase
+          .from('books')
+          .select('id, title, type');
+
+        if (fetchError) {
+          setNotification({ type: 'error', text: 'Gagal mengambil data lama.' });
+          setLoading(false);
+          return;
+        }
+
+        const dbMap = new Map<string, number>();
+        existingBooks?.forEach((b) => {
           if (b.title) {
             const key = `${b.title.trim().toLowerCase()}|${(b.type || 'board book').trim().toLowerCase()}`;
             dbMap.set(key, b.id);
           }
         });
 
-        const cleanData = rawData.map(row => {
-           const getVal = (key: string) => row[key] || '';
-           const cleanTitle = (getVal('title') || 'Tanpa Judul').trim();
-           const cleanType = (getVal('type') || 'Board Book').trim(); 
-           const key = `${cleanTitle.toLowerCase()}|${cleanType.toLowerCase()}`;
-           const existingId = dbMap.get(key);
+        const cleanData = rawData.map((row) => {
+          const getVal = (key: string) => row[key] || '';
+          const cleanTitle = (getVal('title') || 'Tanpa Judul').trim();
+          const cleanType = (getVal('type') || 'Board Book').trim();
+          const key = `${cleanTitle.toLowerCase()}|${cleanType.toLowerCase()}`;
+          const existingId = dbMap.get(key);
 
-           return {
-             id: existingId, 
-             title: cleanTitle,
-             price: row.price ? parseInt(String(row.price).replace(/[^0-9]/g, '')) : 0,
-             author: getVal('author'),
-             publisher: getVal('publisher'),
-             category: getVal('category') || 'Impor',
-             type: cleanType,
-             age: getVal('age'),
-             status: getVal('status') || 'READY',
-             pages: getVal('pages'),
-             eta: getVal('eta'),
-             previewurl: getVal('previewurl'),
-             image: getVal('image'),
-             desc: getVal('desc') || getVal('description') || '',
-             is_highlight: false,
-             sticker_text: getVal('sticker_text') || getVal('sticker') || '', 
-           };
+          return {
+            id: existingId,
+            title: cleanTitle,
+            price: row.price
+              ? parseInt(String(row.price).replace(/[^0-9]/g, ''))
+              : 0,
+            author: getVal('author'),
+            publisher: getVal('publisher'),
+            category: getVal('category') || 'Impor',
+            type: cleanType,
+            age: getVal('age'),
+            status: getVal('status') || 'READY',
+            pages: getVal('pages'),
+            eta: getVal('eta'),
+            previewurl: getVal('previewurl'),
+            image: getVal('image'),
+            desc: getVal('desc') || getVal('description') || '',
+            is_highlight: false,
+            sticker_text: getVal('sticker_text') || getVal('sticker') || '',
+          };
         });
 
-        const uniqueDataMap = new Map();
-        cleanData.forEach(item => {
-            if (item.title !== 'Tanpa Judul' && item.price > 0) {
-                const key = `${item.title.toLowerCase()}|${item.type.toLowerCase()}`;
-                uniqueDataMap.set(key, item);
-            }
-        });
-        const finalPayload = Array.from(uniqueDataMap.values());
-
-        const toInsert: any[] = [];
-        const toUpdate: any[] = [];
-
-        finalPayload.forEach(item => {
-            if (item.id) {
-                toUpdate.push(item);
-            } else {
-                const { id, ...itemWithoutId } = item; 
-                toInsert.push(itemWithoutId);
-            }
+        // Deduplikasi
+        const uniqueMap = new Map();
+        cleanData.forEach((item) => {
+          if (item.title !== 'Tanpa Judul' && item.price > 0) {
+            const key = `${item.title.toLowerCase()}|${item.type.toLowerCase()}`;
+            uniqueMap.set(key, item);
+          }
         });
 
-        let successCount = 0;
-        let errors = [];
+        const finalPayload = Array.from(uniqueMap.values());
+        const toInsert: Record<string, unknown>[] = [];
+        const toUpdate: Record<string, unknown>[] = [];
+
+        finalPayload.forEach((item) => {
+          if (item.id) {
+            toUpdate.push(item);
+          } else {
+            const { id, ...withoutId } = item;
+            toInsert.push(withoutId);
+          }
+        });
+
+        const errors: string[] = [];
+        let insertCount = 0;
+        let updateCount = 0;
 
         if (toInsert.length > 0) {
-            const { error: insertError } = await supabase.from('books').insert(toInsert);
-            if (insertError) errors.push(`Insert Error: ${insertError.message}`);
-            else successCount += toInsert.length;
+          const { error } = await supabase.from('books').insert(toInsert);
+          if (error) errors.push(`Insert: ${error.message}`);
+          else insertCount = toInsert.length;
         }
 
         if (toUpdate.length > 0) {
-            const { error: updateError } = await supabase.from('books').upsert(toUpdate);
-            if (updateError) errors.push(`Update Error: ${updateError.message}`);
-            else successCount += toUpdate.length;
+          const { error } = await supabase.from('books').upsert(toUpdate);
+          if (error) errors.push(`Update: ${error.message}`);
+          else updateCount = toUpdate.length;
         }
 
         if (errors.length > 0) {
-            setMsg({ type: 'error', text: errors.join(" | ") });
-        } else if (successCount > 0) {
-            setMsg({ type: 'success', text: `Berhasil! ${toInsert.length} Baru, ${toUpdate.length} Update.` });
-            fetchBooks();
+          setNotification({ type: 'error', text: errors.join(' | ') });
+        } else if (insertCount + updateCount > 0) {
+          setNotification({
+            type: 'success',
+            text: `Import berhasil! ${insertCount} buku baru, ${updateCount} buku diupdate.`,
+          });
+          fetchBooks();
         } else {
-            setMsg({ type: 'error', text: 'Tidak ada data valid untuk diproses.' });
+          setNotification({ type: 'error', text: 'Tidak ada data valid.' });
         }
-        
+
         setLoading(false);
       },
-      error: (error) => {
-        setMsg({ type: 'error', text: `CSV Error: ${error.message}` });
+
+      error: (err) => {
+        setNotification({ type: 'error', text: `CSV Error: ${err.message}` });
         setLoading(false);
-      }
+      },
     });
 
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    // Reset input
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  // ============================================================
+  // FILTER OPTIONS — type-safe
+  // ============================================================
+  const uniquePublishers = useMemo(
+    () => [
+      'Semua',
+      ...Array.from(
+        new Set(
+          books
+            .map((b) => b.publisher)
+            .filter((x): x is string => typeof x === 'string' && x.length > 0)
+        )
+      ).sort(),
+    ],
+    [books]
+  );
 
-  const uniquePublishers = useMemo(() => ['Semua', ...Array.from(new Set(books.map(b => b.publisher).filter(Boolean))).sort()], [books]);
-  const uniqueAges = useMemo(() => ['Semua', ...Array.from(new Set(books.map(b => b.age).filter(Boolean))).sort()], [books]);
-  const uniqueTypes = useMemo(() => ['Semua', ...Array.from(new Set(books.map(b => b.type).filter(Boolean))).sort()], [books]);
+  const uniqueAges = useMemo(
+    () => [
+      'Semua',
+      ...Array.from(
+        new Set(
+          books
+            .map((b) => b.age)
+            .filter((x): x is string => typeof x === 'string' && x.length > 0)
+        )
+      ).sort(),
+    ],
+    [books]
+  );
 
+  const uniqueTypes = useMemo(
+    () => [
+      'Semua',
+      ...Array.from(
+        new Set(
+          books
+            .map((b) => b.type)
+            .filter((x): x is string => typeof x === 'string' && x.length > 0)
+        )
+      ).sort(),
+    ],
+    [books]
+  );
+
+  // ============================================================
+  // FILTERED BOOKS
+  // ============================================================
   const filteredBooks = useMemo(() => {
-    let result = books.filter(b => {
-      const matchSearch = (b.title || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          (b.author || '').toLowerCase().includes(searchQuery.toLowerCase());
+    const result = books.filter((b) => {
+      const q = searchQuery.toLowerCase();
+      const matchSearch =
+        (b.title || '').toLowerCase().includes(q) ||
+        (b.author || '').toLowerCase().includes(q);
       const matchStatus = filterStatus === 'Semua' || b.status === filterStatus;
-      const matchCategory = filterCategory === 'Semua' || b.category === filterCategory;
+      const matchCategory =
+        filterCategory === 'Semua' || b.category === filterCategory;
       const matchAge = filterAge === 'Semua' || b.age === filterAge;
-      const matchPublisher = filterPublisher === 'Semua' || b.publisher === filterPublisher;
+      const matchPublisher =
+        filterPublisher === 'Semua' || b.publisher === filterPublisher;
       const matchType = filterType === 'Semua' || b.type === filterType;
-      return matchSearch && matchStatus && matchCategory && matchAge && matchPublisher && matchType;
+      return (
+        matchSearch && matchStatus && matchCategory &&
+        matchAge && matchPublisher && matchType
+      );
     });
 
     return result.sort((a, b) => {
@@ -333,36 +476,60 @@ export default function AdminPage() {
       if (sortBy === 'za') return (b.title || '').localeCompare(a.title || '');
       return 0;
     });
-  }, [books, searchQuery, filterStatus, filterCategory, filterAge, filterPublisher, filterType, sortBy]);
+  }, [
+    books, searchQuery, filterStatus, filterCategory,
+    filterAge, filterPublisher, filterType, sortBy,
+  ]);
 
-  const openEditModal = (book: Book) => {
+  // ============================================================
+  // MODAL HANDLERS
+  // ============================================================
+  const openEditModal = useCallback((book: Book) => {
     setFormData({
       ...book,
-      title: book.title ?? '',
-      price: book.price ?? '',
-      author: book.author ?? '',
-      publisher: book.publisher ?? '',
-      pages: book.pages ?? '',
-      image: book.image ?? '',
-      eta: book.eta ?? '',
-      previewurl: book.previewurl ?? '',
-      description: book.desc ?? book.description ?? '', 
-      is_highlight: book.is_highlight ?? false, 
-      sticker_text: book.sticker_text ?? '', 
+      description: book.desc ?? book.description ?? '',
+      is_highlight: book.is_highlight ?? false,
+      sticker_text: book.sticker_text ?? '',
     });
     setIsEditing(true);
     setIsModalOpen(true);
-  };
+  }, []);
 
-  const openAddModal = () => {
-    setFormData(initialForm);
+  const openAddModal = useCallback(() => {
+    setFormData(INITIAL_FORM);
     setIsEditing(false);
     setIsModalOpen(true);
+  }, []);
+
+  // ✅ FIX: Validasi max 4 highlight — pakai notification bukan alert
+  const handleHighlightChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const isTurningOn = e.target.checked;
+
+    if (isTurningOn) {
+      const currentCount = books.filter((b) => b.is_highlight).length;
+      const isAlreadyActive = books.find(
+        (b) => b.id === formData.id
+      )?.is_highlight;
+
+      if (!isAlreadyActive && currentCount >= MAX_HIGHLIGHTS) {
+        setNotification({
+          type: 'error',
+          text: `Batas ${MAX_HIGHLIGHTS} highlight tercapai! Uncheck salah satu buku highlight yang ada dulu.`,
+        });
+        return;
+      }
+    }
+
+    setFormData({ ...formData, is_highlight: isTurningOn });
   };
 
+  // ============================================================
+  // SAVE
+  // ============================================================
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setIsSaving(true);
+
     try {
       const payload = {
         title: formData.title || 'Tanpa Judul',
@@ -377,188 +544,226 @@ export default function AdminPage() {
         image: formData.image || '',
         eta: formData.eta || '',
         previewurl: formData.previewurl || '',
-        desc: formData.description || '', 
+        desc: formData.description || '',
         is_highlight: formData.is_highlight || false,
-        sticker_text: formData.sticker_text || '', 
+        sticker_text: formData.sticker_text || '',
       };
 
-      let response;
+      let error;
       if (isEditing && formData.id) {
-        response = await supabase.from('books').update(payload).eq('id', formData.id);
+        ({ error } = await supabase
+          .from('books')
+          .update(payload)
+          .eq('id', formData.id));
       } else {
-        const { id, ...payloadWithoutId } = payload as any;
-        response = await supabase.from('books').insert([payloadWithoutId]);
+        ({ error } = await supabase.from('books').insert([payload]));
       }
-      if (response.error) throw new Error(response.error.message);
+
+      if (error) throw new Error(error.message);
 
       setIsModalOpen(false);
       fetchBooks();
-      setMsg({ type: 'success', text: 'Berhasil disimpan!' });
-    } catch (err: any) {
-      setMsg({ type: 'error', text: err.message });
-    } finally { setLoading(false); }
-  };
-
-  const handleDelete = async (id: number) => {
-    if (window.confirm('Hapus permanen?')) {
-      await supabase.from('books').delete().eq('id', id);
-      fetchBooks();
-      setMsg({ type: 'success', text: 'Berhasil dihapus.' });
+      setNotification({ type: 'success', text: 'Berhasil disimpan!' });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Terjadi kesalahan.';
+      setNotification({ type: 'error', text: msg });
+    } finally {
+      setIsSaving(false);
     }
   };
 
+  // ============================================================
+  // DELETE
+  // ============================================================
+  const handleDelete = async (id: number) => {
+    const { error } = await supabase.from('books').delete().eq('id', id);
+    if (error) {
+      setNotification({ type: 'error', text: `Gagal hapus: ${error.message}` });
+    } else {
+      setNotification({ type: 'success', text: 'Buku berhasil dihapus.' });
+      fetchBooks();
+    }
+    setConfirmDeleteId(null);
+  };
+
+  // ============================================================
+  // LOADING SCREEN (auth check)
+  // ============================================================
   if (isChecking) {
     return (
       <div className="min-h-screen bg-[#FFF9F0] flex flex-col items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-[#8B5E3C] mb-4"></div>
-        <p className="text-[#8B5E3C] font-black uppercase tracking-widest text-xs">Mengecek Akses Admin...</p>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-[#8B5E3C] mb-4" />
+        <p className="text-[#8B5E3C] font-black uppercase tracking-widest text-xs">
+          Mengecek Akses Admin...
+        </p>
       </div>
     );
   }
 
-  // --- LOGIKA VALIDASI MAX 4 HIGHLIGHT ---
-  const handleHighlightChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const isTurningOn = e.target.checked;
-
-    if (isTurningOn) {
-      const currentHighlightsCount = books.filter(b => b.is_highlight).length;
-      const isAlreadyActive = books.find(b => b.id === formData.id)?.is_highlight;
-
-      if (!isAlreadyActive && currentHighlightsCount >= 4) {
-        alert("⚠️ BATAS MAKSIMAL TERCAPAI!\n\nSudah ada 4 buku yang di-highlight di Homepage.\n\nDemi estetika website, mohon 'uncheck' salah satu buku highlight yang lama terlebih dahulu.");
-        return; 
-      }
-    }
-
-    setFormData({ ...formData, is_highlight: isTurningOn });
-  };
-
+  // ============================================================
+  // RENDER
+  // ============================================================
   return (
     <div className="min-h-screen bg-[#FFF9F0] text-[#6D4C41] font-sans pb-20 overflow-x-hidden text-sm">
-      
-      {/* INPUT FILE TERSEMBUNYI UNTUK IMPORT */}
-      <input 
-        type="file" 
-        accept=".csv" 
-        ref={fileInputRef} 
-        onChange={handleFileChange} 
-        className="hidden" 
+
+      {/* Hidden file input untuk import */}
+      <input
+        type="file"
+        accept=".csv"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        className="hidden"
       />
 
-      {/* --- NAVBAR --- */}
+      {/* ============================================================ */}
+      {/* NAVBAR */}
+      {/* ============================================================ */}
       <header className="bg-[#FFF9F0]/90 backdrop-blur-md border-b border-orange-100 sticky top-0 z-40 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link href="/katalog" className="p-2 hover:bg-white rounded-full transition-all text-[#8B5E3C]">
+            <Link
+              href="/katalog"
+              className="p-2 hover:bg-white rounded-full transition-all text-[#8B5E3C]"
+              aria-label="Kembali ke katalog"
+            >
               <ArrowLeft className="w-6 h-6" />
             </Link>
             <h1 className="text-2xl font-bold text-[#8B5E3C] tracking-tight">
               Akinara<span className="text-[#FF9E9E]">Admin</span>
             </h1>
           </div>
+
           <div className="flex items-center gap-3">
-            
-            {/* BUTTON IMPORT */}
-            <button 
+            <button
               onClick={handleImportClick}
               title="Import CSV"
+              aria-label="Import CSV"
               className="p-2.5 bg-white border border-green-200 text-green-600 hover:bg-green-50 rounded-full transition-all shadow-sm"
             >
               <Upload className="w-5 h-5" />
             </button>
 
-            {/* BUTTON EXPORT */}
-            <button 
+            <button
               onClick={handleExportCSV}
               title="Export CSV"
+              aria-label="Export CSV"
               className="p-2.5 bg-white border border-blue-200 text-blue-600 hover:bg-blue-50 rounded-full transition-all shadow-sm"
             >
               <Download className="w-5 h-5" />
             </button>
 
-            <button onClick={openAddModal} className="bg-[#FF9E9E] hover:bg-[#ff8585] text-white px-6 py-2.5 rounded-full font-bold flex items-center gap-2 transition-all shadow-md active:scale-95">
+            <button
+              onClick={openAddModal}
+              className="bg-[#FF9E9E] hover:bg-[#ff8585] text-white px-6 py-2.5 rounded-full font-bold flex items-center gap-2 transition-all shadow-md active:scale-95"
+            >
               <Plus className="w-4 h-4" /> Tambah
             </button>
-            <button onClick={handleLogout} className="p-2.5 bg-white border border-orange-100 text-[#8B5E3C] hover:text-red-500 rounded-full transition-all shadow-sm group relative" title="Logout">
+
+            <button
+              onClick={handleLogout}
+              title="Logout"
+              aria-label="Logout"
+              className="p-2.5 bg-white border border-orange-100 text-[#8B5E3C] hover:text-red-500 rounded-full transition-all shadow-sm relative"
+            >
               <LogOut className="w-5 h-5" />
-              <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white" title="Auto-logout aktif"></span>
+              <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
             </button>
           </div>
         </div>
       </header>
 
+      {/* ============================================================ */}
+      {/* MAIN */}
+      {/* ============================================================ */}
       <main className="max-w-[96%] mx-auto py-8">
-        
-        {msg.text && (
-          <div className={`mb-6 p-4 rounded-2xl flex items-center gap-3 font-bold text-sm animate-fade-in ${msg.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-            {msg.type === 'success' ? <CheckCircle className="w-5 h-5"/> : <AlertCircle className="w-5 h-5"/>}
-            {msg.text}
+
+        {/* ✅ Notifikasi inline — auto dismiss */}
+        {notification && (
+          <div
+            className={`mb-6 p-4 rounded-2xl flex items-center gap-3 font-bold text-sm ${
+              notification.type === 'success'
+                ? 'bg-green-100 text-green-700'
+                : 'bg-red-100 text-red-700'
+            }`}
+          >
+            {notification.type === 'success' ? (
+              <CheckCircle className="w-5 h-5 shrink-0" />
+            ) : (
+              <AlertCircle className="w-5 h-5 shrink-0" />
+            )}
+            {notification.text}
           </div>
         )}
 
-        {/* === TITIK INSERSI: BANNER MANAGER MUNCUL DI SINI === */}
+        {/* Banner Manager */}
         <Reveal>
           <div className="mb-10">
-             <BannerManager />
+            <BannerManager />
           </div>
         </Reveal>
-        {/* ==================================================== */}
 
-        {/* --- FILTER SECTION --- */}
+        {/* ============================================================ */}
+        {/* FILTER */}
+        {/* ============================================================ */}
         <Reveal>
           <section className="bg-white p-6 rounded-[2.5rem] border border-orange-100 shadow-sm mb-10">
             <div className="flex flex-col xl:flex-row gap-4 items-center">
               <div className="flex-1 w-full flex gap-3">
                 <div className="relative flex-1">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-300" />
-                  <input 
-                    type="text" placeholder="Cari buku" value={searchQuery}
+                  <input
+                    type="text"
+                    placeholder="Cari buku..."
+                    value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-[#F8F9FA] border-none focus:ring-2 focus:ring-orange-100 outline-none text-[#6D4C41] font-bold transition-all"
                   />
                 </div>
-                <button 
+                <button
                   onClick={handleResetFilter}
                   title="Reset Filter"
-                  className="p-3.5 bg-orange-50 text-[#FF9E9E] hover:bg-[#FF9E9E] hover:text-white rounded-2xl transition-all shadow-sm flex items-center justify-center border border-orange-100"
+                  aria-label="Reset filter"
+                  className="p-3.5 bg-orange-50 text-[#FF9E9E] hover:bg-[#FF9E9E] hover:text-white rounded-2xl transition-all shadow-sm border border-orange-100"
                 >
                   <RefreshCcw className="w-5 h-5" />
                 </button>
               </div>
 
               <div className="w-full xl:w-auto grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-4 py-3.5 rounded-2xl bg-[#F8F9FA] text-[#8B5E3C] font-bold outline-none border-none focus:ring-2 focus:ring-orange-50 text-xs cursor-pointer">
-                  <option value="Semua">Status Stok</option>
-                  <option value="READY">READY</option><option value="PO">PO</option><option value="BACKLIST">BACKLIST</option>
-                </select>
-
-                <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="px-4 py-3.5 rounded-2xl bg-[#F8F9FA] text-[#8B5E3C] font-bold outline-none border-none focus:ring-2 focus:ring-orange-50 text-xs cursor-pointer">
-                  <option value="Semua">Jenis Buku</option>
-                  <option value="Impor">Impor</option><option value="Lokal">Lokal</option>
-                </select>
-
-                <select value={filterAge} onChange={(e) => setFilterAge(e.target.value)} className="px-4 py-3.5 rounded-2xl bg-[#F8F9FA] text-[#8B5E3C] font-bold outline-none border-none focus:ring-2 focus:ring-orange-50 text-xs cursor-pointer">
-                  {uniqueAges.map(age => <option key={age} value={age}>{age === 'Semua' ? 'Usia' : age}</option>)}
-                </select>
-
-                <select value={filterPublisher} onChange={(e) => setFilterPublisher(e.target.value)} className="px-4 py-3.5 rounded-2xl bg-[#F8F9FA] text-[#8B5E3C] font-bold outline-none border-none focus:ring-2 focus:ring-orange-50 text-xs cursor-pointer">
-                  {uniquePublishers.map(pub => <option key={pub} value={pub}>{pub === 'Semua' ? 'Penerbit' : pub}</option>)}
-                </select>
-
-                <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="px-4 py-3.5 rounded-2xl bg-[#F8F9FA] text-[#8B5E3C] font-bold outline-none border-none focus:ring-2 focus:ring-orange-50 text-xs cursor-pointer">
-                  {uniqueTypes.map(t => <option key={t} value={t}>{t === 'Semua' ? 'Format' : t}</option>)}
-                </select>
-
-                <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="px-4 py-3.5 rounded-2xl bg-[#F8F9FA] text-[#8B5E3C] font-bold outline-none border-none focus:ring-2 focus:ring-orange-50 text-xs cursor-pointer">
-                  <option value="terbaru">Urutan: Terbaru</option><option value="terlama">Urutan: Terlama</option>
-                  <option value="az">Urutan: A - Z</option><option value="za">Urutan: Z - A</option>
-                </select>
+                {[
+                  { val: filterStatus, set: setFilterStatus, opts: ['Semua', 'READY', 'PO', 'BACKLIST'], label: 'Status Stok' },
+                  { val: filterCategory, set: setFilterCategory, opts: ['Semua', 'Impor', 'Lokal'], label: 'Jenis Buku' },
+                  { val: filterAge, set: setFilterAge, opts: uniqueAges, label: 'Usia' },
+                  { val: filterPublisher, set: setFilterPublisher, opts: uniquePublishers, label: 'Penerbit' },
+                  { val: filterType, set: setFilterType, opts: uniqueTypes, label: 'Format' },
+                  {
+                    val: sortBy, set: setSortBy,
+                    opts: ['terbaru', 'terlama', 'az', 'za'],
+                    labels: ['Terbaru', 'Terlama', 'A - Z', 'Z - A'],
+                    label: 'Urutan'
+                  },
+                ].map((f, i) => (
+                  <select
+                    key={i}
+                    value={f.val}
+                    onChange={(e) => f.set(e.target.value)}
+                    className="px-4 py-3.5 rounded-2xl bg-[#F8F9FA] text-[#8B5E3C] font-bold outline-none border-none focus:ring-2 focus:ring-orange-50 text-xs cursor-pointer"
+                  >
+                    {f.opts.map((opt, oi) => (
+                      <option key={opt} value={opt}>
+                        {(f as any).labels ? (f as any).labels[oi] : (opt === 'Semua' ? f.label : opt)}
+                      </option>
+                    ))}
+                  </select>
+                ))}
               </div>
             </div>
           </section>
         </Reveal>
 
-        {/* --- TABEL DATA --- */}
+        {/* ============================================================ */}
+        {/* TABEL */}
+        {/* ============================================================ */}
         <div className="bg-white rounded-[2.5rem] border border-orange-100 shadow-sm overflow-x-auto">
           <table className="w-full text-left border-collapse whitespace-nowrap">
             <thead>
@@ -572,58 +777,130 @@ export default function AdminPage() {
             </thead>
             <tbody className="divide-y divide-orange-50">
               {loading ? (
-                <tr><td colSpan={5} className="text-center py-20 text-orange-200 font-bold uppercase animate-pulse">Loading...</td></tr>
+                <tr>
+                  <td colSpan={5} className="text-center py-20">
+                    <Loader2 className="w-8 h-8 animate-spin text-orange-200 mx-auto mb-2" />
+                    <p className="text-orange-200 font-bold uppercase text-xs">Loading...</p>
+                  </td>
+                </tr>
               ) : filteredBooks.length === 0 ? (
-                <tr><td colSpan={5} className="text-center py-20 text-gray-400 font-bold">Data tidak ditemukan</td></tr>
+                <tr>
+                  <td colSpan={5} className="text-center py-20 text-gray-400 font-bold">
+                    Data tidak ditemukan
+                  </td>
+                </tr>
               ) : (
                 filteredBooks.map((book) => (
-                  <tr key={book.id} className="hover:bg-[#FFF9F0] transition-all group">
-                    <td className="px-6 py-4 text-xs font-bold text-gray-300 text-center">#{book.id}</td>
+                  <tr key={book.id} className="hover:bg-[#FFF9F0] transition-all">
+                    <td className="px-6 py-4 text-xs font-bold text-gray-300 text-center">
+                      #{book.id}
+                    </td>
+
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-5">
-                        <div className="relative">
-                            <img src={book.image} className="w-14 h-20 object-cover rounded-xl shadow-md bg-gray-100" />
-                            {/* INDIKATOR STICKER DI ADMIN LIST */}
-                            {book.sticker_text && (
-                                <div className="absolute -top-2 -right-2 w-5 h-5 bg-pink-500 rounded-full flex items-center justify-center text-[8px] text-white font-bold shadow-sm z-10 border border-white">
-                                    <Sticker className="w-3 h-3"/>
-                                </div>
-                            )}
+                        {/* ✅ FIX: img dengan error handling */}
+                        <div className="relative shrink-0">
+                          <img
+                            src={book.image || PLACEHOLDER_IMAGE}
+                            alt={book.title}
+                            className="w-14 h-20 object-cover rounded-xl shadow-md bg-gray-100"
+                            onError={(e) => {
+                              e.currentTarget.src = PLACEHOLDER_IMAGE;
+                            }}
+                          />
+                          {book.sticker_text && (
+                            <div className="absolute -top-2 -right-2 w-5 h-5 bg-pink-500 rounded-full flex items-center justify-center text-[8px] text-white font-bold shadow-sm z-10 border border-white">
+                              <Sticker className="w-3 h-3" />
+                            </div>
+                          )}
                         </div>
+
                         <div className="space-y-2">
                           <div className="flex items-center gap-2">
-                             <div className="font-black text-gray-800 text-base leading-tight">{book.title}</div>
-                             {book.is_highlight && <span className="bg-yellow-100 text-yellow-600 text-[9px] px-1.5 py-0.5 rounded font-bold border border-yellow-200"><Star className="w-2.5 h-2.5 inline"/> Featured</span>}
+                            <div className="font-black text-gray-800 text-base leading-tight">
+                              {book.title}
+                            </div>
+                            {book.is_highlight && (
+                              <span className="bg-yellow-100 text-yellow-600 text-[9px] px-1.5 py-0.5 rounded font-bold border border-yellow-200">
+                                <Star className="w-2.5 h-2.5 inline" /> Featured
+                              </span>
+                            )}
                           </div>
-                          
                           <div className="text-[10px] text-orange-400 font-black uppercase tracking-widest flex items-center gap-2">
-                             <User className="w-3 h-3"/> {book.author || 'No Author'}
+                            <User className="w-3 h-3" /> {book.author || 'No Author'}
                           </div>
                           <div className="flex flex-wrap items-center gap-2 text-[9px]">
-                            <span className="flex items-center gap-1 bg-orange-100 text-orange-800 px-2 py-1 rounded-md font-bold shadow-sm">
-                              <Layers className="w-2.5 h-2.5"/> {book.category}
+                            <span className="flex items-center gap-1 bg-orange-100 text-orange-800 px-2 py-1 rounded-md font-bold">
+                              <Layers className="w-2.5 h-2.5" /> {book.category}
                             </span>
-                            <span className="flex items-center gap-1 bg-amber-100 text-amber-900 px-2 py-1 rounded-md font-bold shadow-sm">
-                              <Building2 className="w-2.5 h-2.5"/> {book.publisher || '-'}
+                            <span className="flex items-center gap-1 bg-amber-100 text-amber-900 px-2 py-1 rounded-md font-bold">
+                              <Building2 className="w-2.5 h-2.5" /> {book.publisher || '-'}
                             </span>
-                            <span className="flex items-center gap-1 bg-orange-50 text-[#8B5E3C] px-2 py-1 rounded-md border border-orange-200 font-bold shadow-sm">
-                              <Baby className="w-2.5 h-2.5"/> {book.age}
+                            <span className="flex items-center gap-1 bg-orange-50 text-[#8B5E3C] px-2 py-1 rounded-md border border-orange-200 font-bold">
+                              <Baby className="w-2.5 h-2.5" /> {book.age}
                             </span>
-                            <span className="flex items-center gap-1 bg-[#8B5E3C] text-white px-2 py-1 rounded-md font-bold shadow-sm">
-                              <BookText className="w-2.5 h-2.5"/> {book.type}
+                            <span className="flex items-center gap-1 bg-[#8B5E3C] text-white px-2 py-1 rounded-md font-bold">
+                              <BookText className="w-2.5 h-2.5" /> {book.type}
                             </span>
                           </div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-base font-black text-[#FF9E9E] text-center italic">Rp {Number(book.price).toLocaleString('id-ID')}</td>
-                    <td className="px-6 py-4 text-center">
-                      <span className={`px-4 py-1.5 rounded-full text-[10px] font-black tracking-widest shadow-sm ${book.status === 'READY' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>{book.status}</span>
+
+                    <td className="px-6 py-4 text-base font-black text-[#FF9E9E] text-center italic">
+                      Rp {Number(book.price).toLocaleString('id-ID')}
                     </td>
+
+                    <td className="px-6 py-4 text-center">
+                      <span
+                        className={`px-4 py-1.5 rounded-full text-[10px] font-black tracking-widest shadow-sm ${
+                          book.status === 'READY'
+                            ? 'bg-green-100 text-green-700'
+                            : book.status === 'PO'
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-slate-100 text-slate-600'
+                        }`}
+                      >
+                        {book.status}
+                      </span>
+                    </td>
+
                     <td className="px-6 py-4">
                       <div className="flex justify-center gap-2">
-                        <button onClick={() => openEditModal(book)} className="p-3 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-2xl transition-all"><Edit className="w-5 h-5"/></button>
-                        <button onClick={() => book.id && handleDelete(book.id)} className="p-3 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-2xl transition-all"><Trash2 className="w-5 h-5"/></button>
+                        <button
+                          onClick={() => openEditModal(book)}
+                          aria-label="Edit buku"
+                          className="p-3 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-2xl transition-all"
+                        >
+                          <Edit className="w-5 h-5" />
+                        </button>
+
+                        {/* ✅ FIX: Konfirmasi inline, bukan confirm() */}
+                        {confirmDeleteId === book.id ? (
+                          <div className="flex items-center gap-1 bg-red-50 px-2 py-1 rounded-xl border border-red-200">
+                            <span className="text-[10px] text-red-600 font-bold">Hapus?</span>
+                            <button
+                              onClick={() => book.id && handleDelete(book.id)}
+                              className="text-[10px] bg-red-500 text-white px-2 py-1 rounded-lg font-bold hover:bg-red-600"
+                            >
+                              Ya
+                            </button>
+                            <button
+                              onClick={() => setConfirmDeleteId(null)}
+                              className="text-[10px] text-slate-500 font-bold px-1"
+                            >
+                              Batal
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => book.id && setConfirmDeleteId(book.id)}
+                            aria-label="Hapus buku"
+                            className="p-3 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-2xl transition-all"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -634,132 +911,299 @@ export default function AdminPage() {
         </div>
       </main>
 
-      {/* --- MODAL FORM --- */}
+      {/* ============================================================ */}
+      {/* MODAL FORM */}
+      {/* ============================================================ */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fade-in">
-          <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col scale-up">
-            <div className="px-10 py-6 border-b border-orange-50 flex justify-between items-center bg-[#FFF9F0]/50">
-              <h2 className="text-2xl font-black text-[#8B5E3C] tracking-tighter uppercase">{isEditing ? 'UPDATE KATALOG' : 'INPUT KATALOG BARU'}</h2>
-              <button onClick={() => setIsModalOpen(false)} className="p-3 hover:bg-red-50 text-gray-300 hover:text-red-500 rounded-full transition-all"><X/></button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+          <div
+            className="absolute inset-0"
+            onClick={() => setIsModalOpen(false)}
+            aria-hidden="true"
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={isEditing ? 'Edit buku' : 'Tambah buku baru'}
+            className="relative bg-white rounded-[3rem] shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col"
+          >
+            {/* Modal Header */}
+            <div className="px-10 py-6 border-b border-orange-50 flex justify-between items-center bg-[#FFF9F0]/50 shrink-0">
+              <h2 className="text-2xl font-black text-[#8B5E3C] tracking-tighter uppercase">
+                {isEditing ? 'Update Katalog' : 'Input Katalog Baru'}
+              </h2>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                aria-label="Tutup modal"
+                className="p-3 hover:bg-red-50 text-gray-300 hover:text-red-500 rounded-full transition-all"
+              >
+                <X />
+              </button>
             </div>
+
+            {/* Modal Body */}
             <form onSubmit={handleSave} className="p-10 overflow-y-auto space-y-8">
-               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {/* --- INPUT FIELDS --- */}
-                  <div className="md:col-span-2">
-                    <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2"><Tag className="w-3 h-3"/> Judul Lengkap Buku *</label>
-                    <input required type="text" value={formData.title || ''} onChange={(e) => setFormData({...formData, title: e.target.value})} className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#FF9E9E] outline-none text-gray-900 font-bold text-lg" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2"><Hash className="w-3 h-3"/> Harga Jual (Rp) *</label>
-                    <input required type="number" value={formData.price || ''} onChange={(e) => setFormData({...formData, price: e.target.value})} className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#FF9E9E] outline-none text-gray-900 font-bold text-lg" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2"><BookOpenIcon className="w-3 h-3"/> Format / Material</label>
-                    <select value={formData.type || 'Board Book'} onChange={(e) => setFormData({...formData, type: e.target.value})} className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 font-bold text-gray-900 outline-none">
-                      {formatOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2"><Clock className="w-3 h-3"/> Status Katalog</label>
-                    <select value={formData.status || 'READY'} onChange={(e) => setFormData({...formData, status: e.target.value})} className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 font-bold text-gray-900 outline-none">
-                      <option value="READY">READY STOCK</option><option value="PO">PRE-ORDER</option><option value="BACKLIST">BACKLIST</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2"><Filter className="w-3 h-3"/> Jenis / Asal</label>
-                    <select value={formData.category || 'Impor'} onChange={(e) => setFormData({...formData, category: e.target.value})} className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 font-bold text-gray-900 outline-none">
-                      <option value="Impor">BUKU IMPOR</option><option value="Lokal">BUKU LOKAL</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2"><User className="w-3 h-3"/> Penulis / Kreator</label>
-                    <input type="text" value={formData.author || ''} onChange={(e) => setFormData({...formData, author: e.target.value})} className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#FF9E9E] outline-none text-gray-900 font-bold" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2"><Building2 className="w-3 h-3"/> Penerbit / Publisher</label>
-                    <input type="text" value={formData.publisher || ''} onChange={(e) => setFormData({...formData, publisher: e.target.value})} className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#FF9E9E] outline-none text-gray-900 font-bold" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2"><Baby className="w-3 h-3"/> Rekomendasi Usia</label>
-                    <input type="text" value={formData.age || ''} onChange={(e) => setFormData({...formData, age: e.target.value})} className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#FF9E9E] outline-none text-gray-900 font-bold" placeholder="Misal: 3-5 Tahun" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2"><Youtube className="w-3 h-3"/> Preview URL (Video)</label>
-                    <input type="text" value={formData.previewurl || ''} onChange={(e) => setFormData({...formData, previewurl: e.target.value})} className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#FF9E9E] outline-none text-gray-900 font-bold" placeholder="Link YouTube/Instagram" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2"><Calendar className="w-3 h-3"/> Estimasi Kedatangan (ETA)</label>
-                    <input type="text" value={formData.eta || ''} onChange={(e) => setFormData({...formData, eta: e.target.value})} className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#FF9E9E] outline-none text-gray-900 font-bold" />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2"><ImageIcon className="w-3 h-3"/> Link Cover Gambar Utama *</label>
-                    <input required type="text" value={formData.image || ''} onChange={(e) => setFormData({...formData, image: e.target.value})} className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#FF9E9E] outline-none text-gray-900 font-bold" placeholder="https://..." />
-                  </div>
-                  <div className="md:col-span-3">
-                    <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2"><Globe className="w-3 h-3"/> Deskripsi Lengkap / Sinopsis</label>
-                    <textarea rows={4} value={formData.description || ''} onChange={(e) => setFormData({...formData, description: e.target.value})} className="w-full px-6 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#FF9E9E] outline-none text-gray-900 font-bold leading-relaxed" />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+                {/* Judul */}
+                <div className="md:col-span-2">
+                  <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2">
+                    <Tag className="w-3 h-3" /> Judul Lengkap Buku *
+                  </label>
+                  <input
+                    required
+                    type="text"
+                    value={formData.title || ''}
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#FF9E9E] outline-none text-gray-900 font-bold text-lg"
+                  />
+                </div>
+
+                {/* Harga */}
+                <div>
+                  <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2">
+                    <Hash className="w-3 h-3" /> Harga Jual (Rp) *
+                  </label>
+                  <input
+                    required
+                    type="number"
+                    min="0"
+                    value={formData.price || ''}
+                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                    className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#FF9E9E] outline-none text-gray-900 font-bold text-lg"
+                  />
+                </div>
+
+                {/* Format */}
+                <div>
+                  <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2">
+                    <BookOpenIcon className="w-3 h-3" /> Format / Material
+                  </label>
+                  <select
+                    value={formData.type || 'Board Book'}
+                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                    className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 font-bold text-gray-900 outline-none"
+                  >
+                    {FORMAT_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Status */}
+                <div>
+                  <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2">
+                    <Clock className="w-3 h-3" /> Status Katalog
+                  </label>
+                  <select
+                    value={formData.status || 'READY'}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                    className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 font-bold text-gray-900 outline-none"
+                  >
+                    <option value="READY">READY STOCK</option>
+                    <option value="PO">PRE-ORDER</option>
+                                        <option value="BACKLIST">BACKLIST</option>
+                  </select>
+                </div>
+
+                {/* Kategori */}
+                <div>
+                  <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2">
+                    <Filter className="w-3 h-3" /> Jenis / Asal
+                  </label>
+                  <select
+                    value={formData.category || 'Impor'}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 font-bold text-gray-900 outline-none"
+                  >
+                    <option value="Impor">BUKU IMPOR</option>
+                    <option value="Lokal">BUKU LOKAL</option>
+                  </select>
+                </div>
+
+                {/* Penulis */}
+                <div>
+                  <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2">
+                    <User className="w-3 h-3" /> Penulis / Kreator
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.author || ''}
+                    onChange={(e) => setFormData({ ...formData, author: e.target.value })}
+                    className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#FF9E9E] outline-none text-gray-900 font-bold"
+                  />
+                </div>
+
+                {/* Penerbit */}
+                <div>
+                  <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2">
+                    <Building2 className="w-3 h-3" /> Penerbit / Publisher
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.publisher || ''}
+                    onChange={(e) => setFormData({ ...formData, publisher: e.target.value })}
+                    className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#FF9E9E] outline-none text-gray-900 font-bold"
+                  />
+                </div>
+
+                {/* Usia */}
+                <div>
+                  <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2">
+                    <Baby className="w-3 h-3" /> Rekomendasi Usia
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.age || ''}
+                    onChange={(e) => setFormData({ ...formData, age: e.target.value })}
+                    placeholder="Misal: 3-5 Tahun"
+                    className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#FF9E9E] outline-none text-gray-900 font-bold"
+                  />
+                </div>
+
+                {/* Preview URL */}
+                <div>
+                  <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2">
+                    <Youtube className="w-3 h-3" /> Preview URL (Video)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.previewurl || ''}
+                    onChange={(e) => setFormData({ ...formData, previewurl: e.target.value })}
+                    placeholder="Link YouTube / Instagram"
+                    className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#FF9E9E] outline-none text-gray-900 font-bold"
+                  />
+                </div>
+
+                {/* ETA */}
+                <div>
+                  <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2">
+                    <Calendar className="w-3 h-3" /> Estimasi Kedatangan (ETA)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.eta || ''}
+                    onChange={(e) => setFormData({ ...formData, eta: e.target.value })}
+                    className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#FF9E9E] outline-none text-gray-900 font-bold"
+                  />
+                </div>
+
+                {/* Spesifikasi */}
+                <div>
+                  <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2">
+                    <BookText className="w-3 h-3" /> Spesifikasi Halaman
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.pages || ''}
+                    onChange={(e) => setFormData({ ...formData, pages: e.target.value })}
+                    placeholder="Misal: 32 pages, full colour"
+                    className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#FF9E9E] outline-none text-gray-900 font-bold"
+                  />
+                </div>
+
+                {/* Link Gambar */}
+                <div className="md:col-span-2">
+                  <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2">
+                    <ImageIcon className="w-3 h-3" /> Link Cover Gambar Utama *
+                  </label>
+                  <input
+                    required
+                    type="text"
+                    value={formData.image || ''}
+                    onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+                    placeholder="https://..."
+                    className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#FF9E9E] outline-none text-gray-900 font-bold"
+                  />
+                </div>
+
+                {/* Deskripsi */}
+                <div className="md:col-span-3">
+                  <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2">
+                    <Globe className="w-3 h-3" /> Deskripsi Lengkap / Sinopsis
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={formData.description || ''}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    className="w-full px-6 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#FF9E9E] outline-none text-gray-900 font-bold leading-relaxed"
+                  />
+                </div>
+
+                {/* Highlight & Sticker */}
+                <div className="md:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                  {/* Checkbox Highlight */}
+                  <div className="bg-orange-50 p-4 rounded-2xl border border-orange-100 flex items-center gap-4 hover:bg-orange-100 transition-colors">
+                    <input
+                      type="checkbox"
+                      id="isHighlight"
+                      checked={formData.is_highlight || false}
+                      onChange={handleHighlightChange}
+                      className="w-6 h-6 rounded focus:ring-orange-500 border-gray-300 cursor-pointer accent-[#8B5E3C]"
+                    />
+                    <label htmlFor="isHighlight" className="cursor-pointer">
+                      <span className="flex items-center gap-2 font-black text-[#8B5E3C] uppercase text-xs tracking-widest">
+                        <Star className="w-4 h-4 fill-yellow-400 text-yellow-600" />
+                        Highlight di Homepage?
+                      </span>
+                      <span className="text-xs text-gray-500 font-medium mt-1 block">
+                        Jika dicentang, buku ini tampil di Mini Katalog halaman utama.
+                        (Maks. {MAX_HIGHLIGHTS} buku)
+                      </span>
+                    </label>
                   </div>
 
-                  {/* --- FITUR TAMBAHAN: HIGHLIGHT & STICKER (DROPDOWN) --- */}
-                  <div className="md:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Checkbox Highlight */}
-                      <div className="bg-orange-50 p-4 rounded-2xl border border-orange-100 flex items-center gap-4 hover:bg-orange-100 transition-colors">
-                        <input 
-                            type="checkbox" 
-                            id="isHighlight"
-                            checked={formData.is_highlight || false} 
-                            onChange={handleHighlightChange} 
-                            className="w-6 h-6 text-[#8B5E3C] rounded focus:ring-orange-500 border-gray-300 cursor-pointer accent-[#8B5E3C]" 
-                        />
-                        <label htmlFor="isHighlight" className="cursor-pointer">
-                            <span className="flex items-center gap-2 font-black text-[#8B5E3C] uppercase text-xs tracking-widest">
-                                <Star className="w-4 h-4 fill-yellow-400 text-yellow-600" />
-                                Highlight di Homepage?
-                            </span>
-                            <span className="text-xs text-gray-500 font-medium mt-1 block">
-                                Jika dicentang, buku ini akan muncul di 'Mini Katalog' halaman utama. (Sebaiknya maksimal 4 buku).
-                            </span>
-                        </label>
-                      </div>
-
-                      {/* Dropdown Sticker */}
-                      <div className="bg-pink-50 p-4 rounded-2xl border border-pink-100 hover:bg-pink-100 transition-colors">
-                        <label className="flex items-center gap-2 font-black text-[#8B5E3C] uppercase text-xs tracking-widest mb-2">
-                            <Sticker className="w-4 h-4 text-pink-500" />
-                            Sticker Label (Pojok Kanan)
-                        </label>
-                        <select 
-                            value={formData.sticker_text || ''} 
-                            onChange={(e) => setFormData({...formData, sticker_text: e.target.value})} 
-                            className="w-full px-3 py-2 rounded-lg border border-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-300 bg-white text-sm font-bold text-[#8B5E3C]"
-                        >
-                            <option value="">Tanpa Sticker</option>
-                            {STICKER_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                        </select>
-                        <span className="text-[10px] text-gray-500 mt-1 block">
-                            Pilih label sticker yang ingin ditampilkan. Otomatis menyesuaikan warna dan bentuk.
-                        </span>
-                      </div>
+                  {/* Dropdown Sticker */}
+                  <div className="bg-pink-50 p-4 rounded-2xl border border-pink-100 hover:bg-pink-100 transition-colors">
+                    <label className="flex items-center gap-2 font-black text-[#8B5E3C] uppercase text-xs tracking-widest mb-2">
+                      <Sticker className="w-4 h-4 text-pink-500" />
+                      Sticker Label (Pojok Kanan)
+                    </label>
+                    <select
+                      value={formData.sticker_text || ''}
+                      onChange={(e) =>
+                        setFormData({ ...formData, sticker_text: e.target.value })
+                      }
+                      className="w-full px-3 py-2 rounded-lg border border-pink-200 focus:outline-none focus:ring-2 focus:ring-pink-300 bg-white text-sm font-bold text-[#8B5E3C]"
+                    >
+                      <option value="">Tanpa Sticker</option>
+                      {STICKER_OPTIONS.map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                    <span className="text-[10px] text-gray-500 mt-1 block">
+                      Pilih label sticker yang ingin ditampilkan di kartu buku.
+                    </span>
                   </div>
+                </div>
 
-               </div>
-               <div className="flex gap-4 pt-6">
-                <button type="submit" disabled={loading} className="flex-1 bg-[#8B5E3C] hover:bg-[#6D4C41] text-white py-5 rounded-2xl font-black text-lg shadow-xl disabled:bg-gray-200 transition-all active:scale-95">
-                  {loading ? 'MENYIMPAN...' : 'SIMPAN KE DATABASE'}
+              </div>{/* end grid */}
+
+              {/* Tombol aksi */}
+              <div className="flex gap-4 pt-6">
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="flex-1 bg-[#8B5E3C] hover:bg-[#6D4C41] text-white py-5 rounded-2xl font-black text-lg shadow-xl disabled:bg-gray-200 transition-all active:scale-95 flex items-center justify-center gap-2"
+                >
+                  {isSaving && <Loader2 className="w-5 h-5 animate-spin" />}
+                  {isSaving ? 'MENYIMPAN...' : 'SIMPAN KE DATABASE'}
                 </button>
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-10 bg-gray-100 text-gray-400 font-black rounded-2xl uppercase tracking-widest text-xs">Batal</button>
-               </div>
-            </form>
-          </div>
-        </div>
-      )}
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-10 bg-gray-100 text-gray-400 font-black rounded-2xl uppercase tracking-widest text-xs"
+                >
+                  Batal
+                </button>
+              </div>
 
-      <style jsx>{`
-        .animate-fade-in { animation: fadeIn 0.3s ease-out; }
-        .scale-up { animation: scaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes scaleUp { from { opacity: 0; transform: scale(0.98) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
-      `}</style>
+            </form>{/* end form */}
+          </div>{/* end modal inner */}
+        </div>
+      )}{/* end isModalOpen */}
+
     </div>
   );
 }

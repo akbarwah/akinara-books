@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { CartProvider } from "./context/CartContext"; 
+import { CartProvider } from "./context/CartContext";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { GoogleAnalytics } from '@next/third-parties/google';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,47 +16,86 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// --- BAGIAN INI YANG DI-UPDATE (SEO SUPER LENGKAP) ---
 export const metadata: Metadata = {
-  // Ganti URL ini dengan domain asli Anda (misal: https://akinara.my.id)
-  // Ini penting agar gambar di WA muncul.
-  metadataBase: new URL('https://akinarabooks.my.id'), 
+  metadataBase: new URL("https://akinarabooks.my.id"),
 
   title: {
-    default: "Akinara Books & Library | Treasured Import & Local Children’s Books",
-    template: "%s | Akinara Books"
+    default: "Akinara Books | Toko Buku Anak Import & Lokal Terpilih",
+    template: "%s | Akinara Books",
   },
-  description: "Explore our handpicked collection of extraordinary books, chosen to be the perfect companions for your little explorer’s first steps into the magic of reading.",
   
-  // Konfigurasi untuk Facebook / WhatsApp (Open Graph)
+  description:
+    "Temukan koleksi buku anak import dan lokal pilihan terbaik di Akinara Books. Buku cerita, edukasi, dan dongeng untuk mendampingi si kecil jatuh cinta dengan membaca.",
+
+  keywords: [
+    "akinara books",
+    "buku anak",
+    "buku anak import",
+    "buku anak lokal",
+    "buku cerita anak",
+    "buku anak berkualitas",
+    "toko buku anak online",
+    "beli buku anak online",
+    "jual buku anak",
+    "buku anak bahasa inggris",
+    "buku anak bilingual",
+    "buku anak usia dini",
+    "buku anak TK",
+    "buku anak SD",
+    "toko buku anak online indonesia",
+    "buku anak import murah",
+  ],
+
+  // ✅ Kode verifikasi GSC Anda
+  verification: {
+    google: '8jrtWiL5w29l-yxCJHiV2S_RtFmq1UeMZN0pVOphdAw',
+  },
+
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+    },
+  },
+
+  alternates: {
+    canonical: "https://akinarabooks.my.id",
+  },
+
   openGraph: {
-    title: "Akinara Books & Library",
-    description: "Explore our handpicked collection of extraordinary books, chosen to be the perfect companions for your little explorer’s first steps into the magic of reading.",
-    url: 'https://akinarabooks.my.id',
-    siteName: 'Akinara Books',
-    locale: 'id_ID',
-    type: 'website',
+    title: "Akinara Books | Toko Buku Anak Import & Lokal Terpilih",
+    description:
+      "Temukan koleksi buku anak import dan lokal pilihan terbaik di Akinara Books.",
+    url: "https://akinarabooks.my.id",
+    siteName: "Akinara Books",
+    locale: "id_ID",
+    type: "website",
     images: [
       {
-        url: '/opengraph-image.png', // Pastikan file ini ada di folder public
+        url: "/opengraph-image.png",
         width: 1200,
         height: 630,
-        alt: 'Akinara Books Storefront',
-      }
+        alt: "Akinara Books - Toko Buku Anak Online",
+      },
     ],
   },
 
-  // Konfigurasi untuk Twitter / X
   twitter: {
-    card: 'summary_large_image',
-    title: "Akinara Books & Library",
-    description: "Explore our handpicked collection of extraordinary books, chosen to be the perfect companions for your little explorer’s first steps into the magic of reading.",
-    images: ['/opengraph-image.png'],
+    card: "summary_large_image",
+    title: "Akinara Books | Toko Buku Anak Import & Lokal Terpilih",
+    description:
+      "Temukan koleksi buku anak import dan lokal pilihan terbaik di Akinara Books.",
+    images: ["/opengraph-image.png"],
   },
-  
-  icons: "favicon.ico",
+
+  icons: {
+    icon: "/favicon.ico",
+    shortcut: "/favicon-16x16.png",
+    apple: "/apple-touch-icon.png",
+  },
 };
-// --- BATAS AKHIR UPDATE METADATA ---
 
 export default function RootLayout({
   children,
@@ -63,16 +103,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+    <html lang="id">
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <CartProvider>
           {children}
         </CartProvider>
         <Analytics />
-        <SpeedInsights /> 
+        <SpeedInsights />
+        <GoogleAnalytics gaId="G-XXXXXXXXXX" /> {/* ← isi setelah setup GA4 */}
       </body>
     </html>
-  );
+  )
 }
