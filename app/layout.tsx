@@ -6,6 +6,9 @@ import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { GoogleAnalytics } from '@next/third-parties/google';
 
+// ✅ IMPORT CHATBOT WIDGET DI SINI
+import ChatbotWidget from "./components/ChatbotWidget"; 
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -108,9 +111,13 @@ export default function RootLayout({
         <CartProvider>
           {children}
         </CartProvider>
+        
+        {/* ✅ PASANG NALA SECARA GLOBAL DI SINI */}
+        <ChatbotWidget />
+
         <Analytics />
         <SpeedInsights />
-        <GoogleAnalytics gaId="G-0D6R6RJ5VE" /> {/* ← isi setelah setup GA4 */}
+        <GoogleAnalytics gaId="G-7K589MS6C3" /> 
       </body>
     </html>
   )

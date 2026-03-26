@@ -18,6 +18,7 @@ export default function AkinaraLanding() {
       <FAQSection />
       <Footer />
       <CartDrawer />
+      {/* Nala (ChatbotWidget) telah dihapus dari sini karena sudah pindah ke layout.tsx */}
     </div>
   );
 }
