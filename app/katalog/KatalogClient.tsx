@@ -217,8 +217,8 @@ const Pagination = ({
             aria-label={`Halaman ${number}`}
             aria-current={currentPage === number ? 'page' : undefined}
             className={`w-10 h-10 rounded-full font-bold text-sm transition-all shrink-0 ${currentPage === number
-                ? 'bg-[#8B5E3C] text-white shadow-lg scale-110'
-                : 'bg-white text-[#8B5E3C] border border-orange-100 hover:bg-orange-50'
+              ? 'bg-[#8B5E3C] text-white shadow-lg scale-110'
+              : 'bg-white text-[#8B5E3C] border border-orange-100 hover:bg-orange-50'
               }`}
           >
             {number}
@@ -627,9 +627,8 @@ function KatalogContent({ initialBooks }: { initialBooks: Book[] }) {
             </h1>
             {/* ✅ Deskripsi SEO lebih informatif */}
             <p className="text-[#6D4C41] text-base md:text-lg max-w-2xl mx-auto">
-              Temukan buku anak terbaik dari koleksi import dan lokal kami.
-              Tersedia buku cerita, edukasi, dan dongeng untuk usia dini hingga SD.
-              Pilih dari status Ready Stock atau Pre-Order.
+              Dikurasi khusus untuk si kecil.
+              Filter by usia, format, atau status untuk menemukan buku yang tepat!
             </p>
           </div>
         </Reveal>

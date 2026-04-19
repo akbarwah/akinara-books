@@ -10,8 +10,6 @@ import {
 import { useCart } from '@/app/context/CartContext';
 import Link from 'next/link';
 import type { Book } from '@/app/types/book';
-
-import Navbar from '@/app/components/Navbar';
 import Footer from '@/app/components/Footer';
 import CartDrawer from '@/app/components/CartDrawer';
 import StickerBadge from '@/app/components/StickerBadge';
@@ -96,19 +94,32 @@ const StatusBadge = ({ status, size = 'md' }: { status: string; size?: 'sm' | 'm
 
 export default function BookDetailClient({
     book,
+    variants,      // ✅ BARU
     relatedBooks,
 }: {
     book: Book;
+    variants: Book[];  // ✅ BARU
     relatedBooks: Book[];
 }) {
     const { addToCart } = useCart();
-    const [imgSrc, setImgSrc] = useState(book.image || PLACEHOLDER_IMAGE);
+
+    // ✅ BARU: Active variant state
+    const [activeVariant, setActiveVariant] = useState<Book>(book);
+    const hasVariants = variants.length > 1;
+
+    const [imgSrc, setImgSrc] = useState(activeVariant.image || PLACEHOLDER_IMAGE);
     const [copied, setCopied] = useState(false);
 
+    // ✅ BARU: Update image saat ganti varian
+    const handleVariantChange = (variant: Book) => {
+        setActiveVariant(variant);
+        setImgSrc(variant.image || PLACEHOLDER_IMAGE);
+    };
+
     const isBacklisted =
-        book.status === 'BACKLIST' ||
-        book.status === 'REFERENSI' ||
-        book.status === 'ARCHIVE';
+        activeVariant.status === 'BACKLIST' ||
+        activeVariant.status === 'REFERENSI' ||
+        activeVariant.status === 'ARCHIVE';
 
     const handleShare = async () => {
         try {
@@ -123,56 +134,67 @@ export default function BookDetailClient({
 
     const handleShareWhatsApp = () => {
         const url = typeof window !== 'undefined' ? window.location.href : '';
-        const text = `Lihat buku *${book.title}* di Akinara Books!\n${formatRupiah(book.price ?? 0)}\n\n${url}`;
+        const text = `Lihat buku *${activeVariant.title}* di Akinara Books!\n${formatRupiah(activeVariant.price ?? 0)}\n\n${url}`;
         window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
     };
 
     return (
         <div className="min-h-screen bg-[#FFF9F0] flex flex-col font-sans overflow-x-hidden">
-            <Navbar />
+            {/* ✅ Catalog-style Header (bukan landing page Navbar) */}
+            <header className="bg-[#FFF9F0]/90 backdrop-blur-md border-b border-orange-100 sticky top-0 z-40 shadow-sm">
+                <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+                    {/* Left: Kembali */}
+                    <Link
+                        href="/katalog"
+                        className="inline-flex items-center gap-2 text-gray-500 hover:text-orange-500 transition-colors font-bold text-sm"
+                    >
+                        <ArrowLeft className="w-4 h-4" /> Kembali
+                    </Link>
+
+                    {/* Center: Branding */}
+                    <Link href="/katalog" className="absolute left-1/2 -translate-x-1/2">
+                        <h1 className="text-xl font-bold text-[#8B5E3C] tracking-tight">
+                            Akinara<span className="text-[#FF9E9E]">Catalog</span>
+                        </h1>
+                    </Link>
+
+                    {/* Right: Share + Cart */}
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={handleShare}
+                            className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-orange-100 rounded-full font-bold text-[#8B5E3C] hover:bg-orange-50 transition-colors shadow-sm text-xs"
+                        >
+                            {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                            <span className="hidden sm:inline">{copied ? 'Tersalin!' : 'Copy Link'}</span>
+                        </button>
+                        <button
+                            onClick={handleShareWhatsApp}
+                            className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-green-100 rounded-full font-bold text-green-600 hover:bg-green-50 transition-colors shadow-sm text-xs"
+                        >
+                            <Share2 className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Share WA</span>
+                        </button>
+                    </div>
+                </div>
+            </header>
 
             <main className="flex-1 pt-8 pb-20">
                 <div className="max-w-6xl mx-auto px-4">
 
-                    {/* ===== BREADCRUMB & NAV ===== */}
-                    <div className="flex items-center justify-between xl:justify-start gap-4 mb-6 text-sm">
-                        <Link
-                            href="/katalog"
-                            className="inline-flex items-center gap-2 text-gray-500 hover:text-orange-500 transition-colors font-bold"
-                        >
-                            <ArrowLeft className="w-4 h-4" /> Kembali
+                    {/* ✅ Breadcrumb (tanpa tombol Kembali & Share, sudah di header) */}
+                    <nav className="hidden xl:flex items-center gap-2 text-gray-400 text-sm mb-6" aria-label="Breadcrumb">
+                        <Link href="/" className="hover:text-orange-500 transition-colors">
+                            Home
                         </Link>
-
-                        <nav className="hidden xl:flex items-center gap-2 text-gray-400" aria-label="Breadcrumb">
-                            <Link href="/" className="hover:text-orange-500 transition-colors">
-                                Home
-                            </Link>
-                            <ChevronRight className="w-3 h-3" />
-                            <Link href="/katalog" className="hover:text-orange-500 transition-colors">
-                                Katalog
-                            </Link>
-                            <ChevronRight className="w-3 h-3" />
-                            <span className="text-[#8B5E3C] font-bold truncate max-w-md">
-                                {book.title}
-                            </span>
-                        </nav>
-
-                        <div className="ml-auto flex items-center gap-2">
-                            <button
-                                onClick={handleShare}
-                                className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-orange-100 rounded-full font-bold text-[#8B5E3C] hover:bg-orange-50 transition-colors shadow-sm text-xs"
-                            >
-                                {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-                                {copied ? 'Tersalin!' : 'Copy Link'}
-                            </button>
-                            <button
-                                onClick={handleShareWhatsApp}
-                                className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-green-100 rounded-full font-bold text-green-600 hover:bg-green-50 transition-colors shadow-sm text-xs"
-                            >
-                                <Share2 className="w-4 h-4" /> Share WA
-                            </button>
-                        </div>
-                    </div>
+                        <ChevronRight className="w-3 h-3" />
+                        <Link href="/katalog" className="hover:text-orange-500 transition-colors">
+                            Katalog
+                        </Link>
+                        <ChevronRight className="w-3 h-3" />
+                        <span className="text-[#8B5E3C] font-bold truncate max-w-md">
+                            {activeVariant.title}
+                        </span>
+                    </nav>
 
                     {/* ===== MAIN CARD ===== */}
                     <div className="bg-white rounded-[2rem] shadow-xl shadow-orange-100/50 p-6 md:p-10 flex flex-col md:flex-row gap-8 md:gap-12 relative overflow-hidden">
@@ -183,19 +205,19 @@ export default function BookDetailClient({
                         {/* --- Left: Image --- */}
                         <div className="w-full md:w-5/12 lg:w-1/2 flex flex-col relative z-10">
                             <div className="bg-gray-50 rounded-[2rem] p-8 flex items-center justify-center border border-gray-100 relative">
-                                {book.sticker_text && <StickerBadge type={book.sticker_text} />}
+                                {activeVariant.sticker_text && <StickerBadge type={activeVariant.sticker_text} />}
                                 <img
                                     src={imgSrc}
-                                    alt={`Cover buku ${book.title}${book.author ? ` karya ${book.author}` : ''}`}
+                                    alt={`Cover buku ${activeVariant.title}${activeVariant.author ? ` karya ${activeVariant.author}` : ''}`}
                                     className="w-full max-w-[400px] object-contain rounded-lg shadow-lg hover:scale-105 transition-transform duration-500"
                                     onError={() => setImgSrc(PLACEHOLDER_IMAGE)}
                                 />
                             </div>
 
                             {/* Preview button */}
-                            {book.previewurl && (
+                            {activeVariant.previewurl && (
                                 <a
-                                    href={book.previewurl}
+                                    href={activeVariant.previewurl}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="mt-4 flex items-center justify-center gap-2 w-full py-3 bg-orange-50 hover:bg-orange-100 text-[#8B5E3C] rounded-2xl font-bold text-sm transition-colors border border-orange-100"
@@ -211,33 +233,101 @@ export default function BookDetailClient({
 
                             {/* Status Badges */}
                             <div className="flex flex-wrap gap-2 mb-4">
-                                <StatusBadge status={book.status} size="md" />
+                                <StatusBadge status={activeVariant.status} size="md" />
                                 <span className="inline-block px-3 py-1 bg-orange-100 text-[#8B5E3C] text-xs font-bold rounded-full">
-                                    {book.type}
+                                    {activeVariant.type}
                                 </span>
                                 <span className="inline-block px-3 py-1 bg-[#FF9E9E] text-white text-xs font-bold rounded-full">
-                                    {book.age}
+                                    {activeVariant.age}
                                 </span>
                             </div>
 
                             {/* Title & Price */}
                             <h1 className="text-3xl md:text-5xl font-black text-[#8B5E3C] mb-3 leading-tight">
-                                {book.title}
+                                {activeVariant.title}
                             </h1>
-                            <div className="mb-8">
+                            <div className="mb-6">
                                 <p className="text-3xl md:text-4xl font-black text-[#FF9E9E]">
-                                    {formatRupiah(book.price ?? 0)}
+                                    {formatRupiah(activeVariant.price ?? 0)}
                                 </p>
                             </div>
+
+                            {/* ✅ BARU: Variant Selector */}
+                            {hasVariants && (
+                                <div className="mb-8">
+                                    <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                        <BookIcon className="w-3.5 h-3.5" />
+                                        Pilih Format
+                                        <span className="text-[10px] text-orange-400 normal-case tracking-normal font-bold">
+                                            ({variants.length} varian tersedia)
+                                        </span>
+                                    </h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        {variants.map((variant) => {
+                                            const isActive = activeVariant.id === variant.id;
+                                            const isAvailable = variant.status === 'READY' || variant.status === 'PO';
+
+                                            return (
+                                                <button
+                                                    key={variant.id}
+                                                    onClick={() => handleVariantChange(variant)}
+                                                    className={`
+                            relative px-4 py-3 rounded-2xl border-2 text-left transition-all group
+                            ${isActive
+                                                            ? 'border-[#8B5E3C] bg-orange-50 shadow-md ring-1 ring-[#8B5E3C]/20'
+                                                            : 'border-gray-200 bg-white hover:border-orange-200 hover:bg-orange-50/50'
+                                                        }
+                          `}
+                                                >
+                                                    {/* Active indicator */}
+                                                    {isActive && (
+                                                        <div className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-[#8B5E3C] rounded-full flex items-center justify-center">
+                                                            <Check className="w-2.5 h-2.5 text-white" />
+                                                        </div>
+                                                    )}
+
+                                                    {/* Format name */}
+                                                    <div className={`text-sm font-bold ${isActive ? 'text-[#8B5E3C]' : 'text-gray-600'}`}>
+                                                        {variant.type}
+                                                    </div>
+
+                                                    {/* Price */}
+                                                    <div className={`text-xs font-black mt-0.5 ${isActive ? 'text-[#FF9E9E]' : 'text-gray-400'}`}>
+                                                        {formatRupiah(variant.price ?? 0)}
+                                                    </div>
+
+                                                    {/* Status dot */}
+                                                    <div className="flex items-center gap-1 mt-1">
+                                                        <div className={`w-1.5 h-1.5 rounded-full ${variant.status === 'READY'
+                                                            ? 'bg-green-500'
+                                                            : variant.status === 'PO'
+                                                                ? 'bg-blue-500'
+                                                                : 'bg-gray-300'
+                                                            }`} />
+                                                        <span className={`text-[10px] font-bold ${isActive ? 'text-gray-500' : 'text-gray-400'
+                                                            }`}>
+                                                            {variant.status === 'READY'
+                                                                ? 'Ready Stock'
+                                                                : variant.status === 'PO'
+                                                                    ? 'Pre-Order'
+                                                                    : 'Backlist'}
+                                                        </span>
+                                                    </div>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Status & ETA */}
                             <div className="bg-orange-50/50 p-5 rounded-2xl mb-8 border border-orange-100/50 text-sm">
                                 <div className="flex justify-between items-center mb-2 pb-2 border-b border-orange-100/50">
                                     <span className="text-gray-500 font-medium">Status Ketersediaan:</span>
                                     <span className="font-bold text-[#8B5E3C]">
-                                        {book.status === 'READY'
+                                        {activeVariant.status === 'READY'
                                             ? '✓ Tersedia (Ready Stock)'
-                                            : book.status === 'PO'
+                                            : activeVariant.status === 'PO'
                                                 ? '⏳ Pre-Order'
                                                 : '🚫 Belum Masuk Batch PO'}
                                     </span>
@@ -245,7 +335,7 @@ export default function BookDetailClient({
                                 <div className="flex justify-between items-center">
                                     <span className="text-gray-500 font-medium">Estimasi Kedatangan (ETA):</span>
                                     <span className="font-bold text-orange-600 bg-orange-100 px-2 py-0.5 rounded-md">
-                                        {book.eta || 'Harap Hubungi Admin'}
+                                        {activeVariant.eta || 'Harap Hubungi Admin'}
                                     </span>
                                 </div>
                             </div>
@@ -256,19 +346,19 @@ export default function BookDetailClient({
                                     <span className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">
                                         <User className="w-3 h-3" /> Penulis
                                     </span>
-                                    <span className="font-medium text-[#6D4C41]">{book.author || '-'}</span>
+                                    <span className="font-medium text-[#6D4C41]">{activeVariant.author || '-'}</span>
                                 </div>
                                 <div className="flex flex-col gap-1">
                                     <span className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">
                                         <Building2 className="w-3 h-3" /> Penerbit
                                     </span>
-                                    <span className="font-medium text-[#6D4C41]">{book.publisher || '-'}</span>
+                                    <span className="font-medium text-[#6D4C41]">{activeVariant.publisher || '-'}</span>
                                 </div>
                                 <div className="flex flex-col gap-1">
                                     <span className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">
                                         <BookIcon className="w-3 h-3" /> Spesifikasi
                                     </span>
-                                    <span className="font-medium text-[#6D4C41]">{book.pages || '-'}</span>
+                                    <span className="font-medium text-[#6D4C41]">{activeVariant.pages || '-'}</span>
                                 </div>
                             </div>
 
@@ -278,7 +368,7 @@ export default function BookDetailClient({
                                     <Globe className="w-5 h-5 text-[#FF9E9E]" /> Sinopsis / Deskripsi
                                 </h3>
                                 <div className="text-gray-600 leading-relaxed text-sm md:text-base border-l-4 border-orange-100 pl-4 py-1">
-                                    {book.description || book.desc || 'Belum ada deskripsi untuk buku ini.'}
+                                    {activeVariant.description || activeVariant.desc || 'Belum ada deskripsi untuk buku ini.'}
                                 </div>
                             </div>
 
@@ -287,7 +377,7 @@ export default function BookDetailClient({
                                 <div className="flex gap-4">
                                     {isBacklisted ? (
                                         <a
-                                            href={getWaLink(book)}
+                                            href={getWaLink(activeVariant)}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="flex-1 text-white py-4 rounded-2xl font-bold text-center bg-slate-500 hover:bg-slate-600 transition-all flex items-center justify-center gap-2 shadow-lg shadow-slate-200 hover:-translate-y-1"
@@ -296,7 +386,7 @@ export default function BookDetailClient({
                                         </a>
                                     ) : (
                                         <button
-                                            onClick={() => addToCart(book)}
+                                            onClick={() => addToCart(activeVariant)}
                                             className="flex-1 text-white py-4 rounded-2xl font-bold text-center bg-gradient-to-r from-[#8B5E3C] to-[#a0724f] hover:from-[#6D4C41] hover:to-[#8B5E3C] transition-all flex items-center justify-center gap-2 shadow-xl shadow-orange-900/20 hover:-translate-y-1 text-lg"
                                         >
                                             <ShoppingBag className="w-6 h-6" /> Tambahkan ke Keranjang
@@ -316,15 +406,15 @@ export default function BookDetailClient({
                                 <Eye className="w-6 h-6 text-[#FF9E9E]" /> Sneak Peek Video
                             </h4>
 
-                            {book.previewurl && isEmbeddable(book.previewurl) ? (
+                            {activeVariant.previewurl && isEmbeddable(activeVariant.previewurl) ? (
                                 <div
-                                    className={`relative w-full rounded-3xl overflow-hidden shadow-lg border border-orange-100 bg-white ${book.previewurl.includes('instagram') ? 'h-[600px]' : 'aspect-video'
+                                    className={`relative w-full rounded-3xl overflow-hidden shadow-lg border border-orange-100 bg-white ${activeVariant.previewurl.includes('instagram') ? 'h-[600px]' : 'aspect-video'
                                         }`}
                                 >
                                     <iframe
                                         className="absolute inset-0 w-full h-full"
-                                        src={getEmbedUrl(book.previewurl) as string}
-                                        title={`Preview buku ${book.title}`}
+                                        src={getEmbedUrl(activeVariant.previewurl) as string}
+                                        title={`Preview buku ${activeVariant.title}`}
                                         loading="lazy"
                                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
                                         sandbox="allow-scripts allow-same-origin allow-presentation"

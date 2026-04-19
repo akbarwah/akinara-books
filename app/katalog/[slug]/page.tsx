@@ -23,43 +23,121 @@ async function getBook(slug: string): Promise<Book | null> {
     return data as Book;
 }
 
+// ✅ BARU: Ambil semua varian (judul sama, tipe beda)
+async function getBookVariants(book: Book): Promise<Book[]> {
+    const { data } = await supabase
+        .from('books')
+        .select('*')
+        .eq('title', book.title.trim())
+        .order('price', { ascending: true });
+
+    if (!data || data.length <= 1) return []; // Tidak ada varian lain
+    return data as Book[];
+}
+
 async function getRelatedBooks(currentBook: Book): Promise<Book[]> {
-    // Ambil buku dengan kategori atau usia yang sama
+    // ✅ Fetch lebih targeted — hanya buku yang kemungkinan relevan
     const { data } = await supabase
         .from('books')
         .select('*')
         .neq('id', currentBook.id)
-        .limit(50);
+        .or(
+            [
+                currentBook.author ? `author.eq.${currentBook.author}` : '',
+                currentBook.category ? `category.eq.${currentBook.category}` : '',
+                currentBook.publisher ? `publisher.eq.${currentBook.publisher}` : '',
+                currentBook.age ? `age.eq.${currentBook.age}` : '',
+            ]
+                .filter(Boolean)
+                .join(',')
+        )
+        .limit(200);
 
-    if (!data) return [];
+    if (!data || data.length === 0) return [];
 
-    const currentSeries = currentBook.title
-        .toLowerCase()
-        .replace(/[^\w\s]/gi, '')
-        .split(' ')
-        .slice(0, 2)
-        .join(' ');
+    // ✅ Ambil 2 & 3 kata pertama untuk deteksi seri (lebih akurat)
+    const normalize = (title: string) =>
+        title.toLowerCase().replace(/[^\w\s]/gi, '').trim();
 
-    // Scoring logic
+    const currentWords = normalize(currentBook.title).split(/\s+/);
+    const currentSeries2 = currentWords.slice(0, 2).join(' ');
+    const currentSeries3 = currentWords.slice(0, 3).join(' ');
+
+    // ✅ Scoring logic — lebih granular
     const scored = (data as Book[])
         .map((b) => {
             let score = 0;
-            const bSeries = b.title
-                .toLowerCase()
-                .replace(/[^\w\s]/gi, '')
-                .split(' ')
-                .slice(0, 2)
-                .join(' ');
+            const bWords = normalize(b.title).split(/\s+/);
+            const bSeries2 = bWords.slice(0, 2).join(' ');
+            const bSeries3 = bWords.slice(0, 3).join(' ');
 
-            if (bSeries === currentSeries && currentSeries.length > 3) score += 10;
-            if (b.author && currentBook.author && b.author === currentBook.author) score += 5;
-            if (b.category === currentBook.category) score += 1;
+            // 🥇 Seri yang sama (3 kata) — paling kuat
+            if (
+                currentSeries3.length > 5 &&
+                bSeries3 === currentSeries3
+            ) {
+                score += 15;
+            }
+            // 🥈 Seri yang sama (2 kata) — kuat
+            else if (
+                currentSeries2.length > 3 &&
+                bSeries2 === currentSeries2
+            ) {
+                score += 10;
+            }
+
+            // 🥉 Author sama
+            if (
+                b.author &&
+                currentBook.author &&
+                b.author.toLowerCase() === currentBook.author.toLowerCase()
+            ) {
+                score += 5;
+            }
+
+            // ✅ Publisher sama
+            if (
+                b.publisher &&
+                currentBook.publisher &&
+                b.publisher.toLowerCase() === currentBook.publisher.toLowerCase()
+            ) {
+                score += 3;
+            }
+
+            // ✅ Usia sama
+            if (
+                b.age &&
+                currentBook.age &&
+                b.age === currentBook.age
+            ) {
+                score += 3;
+            }
+
+            // ✅ Type/format sama
+            if (
+                b.type &&
+                currentBook.type &&
+                b.type.toLowerCase() === currentBook.type.toLowerCase()
+            ) {
+                score += 1;
+            }
+
+            // Kategori sama (Impor/Lokal)
+            if (b.category === currentBook.category) {
+                score += 1;
+            }
+
             return { ...b, _score: score };
         })
         .filter((b) => b._score > 0)
-        .sort((a, b) => b._score - a._score);
+        .sort((a, b) => {
+            // ✅ Sort by score, lalu by status (READY first)
+            if (b._score !== a._score) return b._score - a._score;
+            const statusOrder: Record<string, number> = { READY: 0, PO: 1, BACKLIST: 2 };
+            return (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9);
+        });
 
-    // Deduplicate by title
+    // ✅ Deduplicate by title (ambil yang skor tertinggi / READY)
     const unique: Book[] = [];
     const seen = new Set<string>();
     for (const b of scored) {
@@ -68,7 +146,7 @@ async function getRelatedBooks(currentBook: Book): Promise<Book[]> {
             unique.push(b);
             seen.add(key);
         }
-        if (unique.length >= 4) break;
+        if (unique.length >= 6) break;
     }
 
     return unique;
@@ -131,7 +209,17 @@ export default async function BookDetailPage({ params }: PageProps) {
         notFound();
     }
 
-    const relatedBooks = await getRelatedBooks(book);
+    // ✅ Fetch varian + rekomendasi secara parallel
+    const [variants, relatedBooks] = await Promise.all([
+        getBookVariants(book),
+        getRelatedBooks(book),
+    ]);
 
-    return <BookDetailClient book={book} relatedBooks={relatedBooks} />;
+    return (
+        <BookDetailClient
+            book={book}
+            variants={variants}
+            relatedBooks={relatedBooks}
+        />
+    );
 }
