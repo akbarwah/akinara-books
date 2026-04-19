@@ -91,7 +91,7 @@ export default function POInfoBanner() {
 
       <div className="max-w-4xl mx-auto px-4 relative z-10">
         <div
-          className={`group backdrop-blur-sm rounded-[2rem] p-6 md:p-8 shadow-lg border transition-all duration-500 ease-out hover:-translate-y-1 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden ${
+          className={`group backdrop-blur-sm rounded-[2rem] p-6 md:p-8 shadow-lg border transition-all duration-500 ease-out hover:-translate-y-1 flex flex-col items-center text-center gap-6 relative overflow-hidden ${
             isExpired
               ? 'bg-white/60 border-slate-200'
               : 'bg-white/80 border-orange-100 hover:shadow-[0_20px_40px_-15px_rgba(255,158,158,0.3)] hover:border-orange-300'
@@ -100,35 +100,35 @@ export default function POInfoBanner() {
           {/* Shine effect */}
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-[200%] group-hover:translate-x-[200%] transition-transform duration-1000 ease-in-out pointer-events-none rounded-[2rem]" />
 
-          <div className="flex-1 relative z-10 text-center md:text-left">
+          <div className="relative z-10 flex flex-col items-center">
             {/* Status badges */}
-            <div className="flex items-center justify-center md:justify-start gap-3 mb-3">
+            <div className="flex flex-wrap items-center justify-center gap-3 mb-4 mt-2">
               {isExpired ? (
-                <span className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-[10px] font-black uppercase tracking-widest border border-blue-200 shadow-sm">
+                <span className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-50 text-blue-700 rounded-full text-xs font-black uppercase tracking-widest border border-blue-200 shadow-sm">
                   <span className="relative flex h-2 w-2">
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
                   </span>
                   Order Submitted
                 </span>
               ) : (
-                <span className="flex items-center gap-1.5 px-3 py-1 bg-green-50 text-green-700 rounded-full text-[10px] font-black uppercase tracking-widest border border-green-200 shadow-sm">
+                <span className="flex items-center gap-1.5 px-4 py-1.5 bg-green-50 text-green-700 rounded-full text-xs font-black uppercase tracking-widest border border-green-200 shadow-sm">
                   <span className="relative flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
                   </span>
-                  Ongoing Batch
+                  Ongoing PO
                 </span>
               )}
 
               {!isExpired && daysLeft > 0 && (
-                <span className="flex items-center gap-1.5 px-3 py-1 bg-red-50 text-red-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-red-200 shadow-sm">
-                  <Clock className="w-3 h-3 animate-pulse" /> {daysLeft} Hari Lagi
+                <span className="flex items-center gap-1.5 px-4 py-1.5 bg-red-50 text-red-600 rounded-full text-xs font-black uppercase tracking-widest border border-red-200 shadow-sm">
+                  <Clock className="w-4 h-4 animate-pulse" /> {daysLeft} Hari Lagi
                 </span>
               )}
             </div>
 
             {/* Publisher name */}
-            <h3 className="text-2xl md:text-3xl font-black text-[#8B5E3C] leading-tight tracking-wide mb-2">
+            <h3 className="text-3xl md:text-4xl font-black text-[#8B5E3C] leading-tight tracking-wide mb-4">
               {isExpired ? 'Batch Closed: ' : 'Open PO: '}
               <span
                 className={`text-transparent bg-clip-text bg-gradient-to-r ${
@@ -142,41 +142,43 @@ export default function POInfoBanner() {
             </h3>
 
             {/* Info chips */}
-            <div className="flex flex-wrap justify-center md:justify-start gap-4 text-xs md:text-sm text-[#6D4C41] font-bold opacity-80">
+            <div className="flex flex-wrap justify-center gap-4 text-sm text-[#6D4C41] font-bold opacity-90 mx-auto max-w-2xl">
               {!isExpired && (
-                <div className="flex items-center gap-2 bg-orange-50/50 px-3 py-1.5 rounded-lg border border-orange-100/50">
-                  <Calendar className="w-4 h-4 text-orange-400" />
+                <div className="flex items-center gap-2 bg-orange-50/80 px-4 py-2 rounded-xl border border-orange-100/50 shadow-sm">
+                  <Calendar className="w-5 h-5 text-orange-400" />
                   <span>
-                    Tutup: <strong className="text-[#8B5E3C]">{formattedDate}</strong>
+                    Close Date: <strong className="text-[#8B5E3C] text-base">{formattedDate}</strong>
                   </span>
                 </div>
               )}
               <div
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl border shadow-sm ${
                   isExpired
-                    ? 'bg-blue-50/50 border-blue-100/50'
-                    : 'bg-orange-50/50 border-orange-100/50'
+                    ? 'bg-blue-50/80 border-blue-100/50'
+                    : 'bg-orange-50/80 border-orange-100/50'
                 }`}
               >
-                <Truck className={`w-4 h-4 ${isExpired ? 'text-blue-400' : 'text-orange-400'}`} />
+                <Truck className={`w-5 h-5 ${isExpired ? 'text-blue-400' : 'text-orange-400'}`} />
                 <span>
-                  ETA Indo: <strong className="text-[#8B5E3C]">{bannerData.eta_text}</strong>
+                  ETA Indo: <strong className="text-[#8B5E3C] text-base">{bannerData.eta_text}</strong>
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Waitlist CTA */}
-          {isExpired && bannerData.waitlist_link && (
-            <a
-              href={bannerData.waitlist_link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full md:w-auto px-8 py-4 bg-slate-600 text-white rounded-2xl font-black text-xs tracking-widest hover:bg-slate-700 transition-all shadow-md active:scale-95 flex items-center justify-center gap-2"
-            >
-              <Bookmark className="w-4 h-4" /> GABUNG WAITLIST
-            </a>
-          )}
+          <div className="flex flex-wrap justify-center gap-4 mt-6 w-full">
+            {/* Waitlist CTA */}
+            {isExpired && bannerData.waitlist_link && (
+              <a
+                href={bannerData.waitlist_link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full sm:w-auto px-8 py-4 bg-slate-600 text-white rounded-full font-black text-sm tracking-wider hover:bg-slate-700 transition-all shadow-md active:scale-95 flex items-center justify-center gap-2"
+              >
+                <Bookmark className="w-5 h-5" /> GABUNG WAITLIST
+              </a>
+            )}
+          </div>
         </div>
       </div>
     </div>

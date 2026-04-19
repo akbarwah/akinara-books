@@ -18,6 +18,17 @@ const nextConfig: NextConfig = {
   // ✅ FIX: Kompres semua response
   compress: true,
 
+  // ✅ TAMBAHAN: Redirect URL lama ke slug baru
+  async redirects() {
+    return [
+      {
+        source: "/buku/:path*",
+        destination: "/katalog/:path*",
+        permanent: true, // 301 redirect (SEO friendly)
+      },
+    ];
+  },
+
   // ✅ FIX: Security headers
   async headers() {
     return [

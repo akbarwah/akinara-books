@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, Send, Bot, Loader2 } from 'lucide-react';
+import { usePathname } from 'next/navigation';
 
 type Message = {
   id: string;
@@ -49,6 +50,7 @@ const formatText = (text: string) => {
 };
 
 export default function ChatbotWidget() {
+  const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -163,6 +165,7 @@ export default function ChatbotWidget() {
   };
 
   if (!isMounted) return null;
+  if (pathname?.startsWith('/admin')) return null;
 
   return (
     <>

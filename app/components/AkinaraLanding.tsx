@@ -6,6 +6,7 @@ import MiniCatalog from './MiniCatalog';
 import FAQSection from './FAQSection';
 import Footer from './Footer';
 import CartDrawer from './CartDrawer';
+import TrackOrderCTA from './TrackOrderCTA';
 
 export default function AkinaraLanding() {
   return (
@@ -13,6 +14,7 @@ export default function AkinaraLanding() {
       <Navbar />
       <Hero />
       <POInfoBanner />
+      <TrackOrderCTA />
       <Features />
       <MiniCatalog />
       <FAQSection />

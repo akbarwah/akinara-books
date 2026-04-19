@@ -5,7 +5,7 @@ import { supabase } from '@/supabaseClient';
 import {
   ShoppingBag, Star, Truck, Clock, Bookmark,
   MessageCircle, Eye, User, Building2, Book as BookIcon, Globe,
-  X, ArrowRight, Sparkles, Flame, Hourglass
+  X, ArrowRight, Sparkles, Flame, Hourglass, Share2, Check
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 
@@ -13,6 +13,7 @@ import { useCart } from '../context/CartContext';
 // TIPE DATA
 // ============================================================
 import type { Book } from '@/app/types/book';
+import { generateBookSlug } from './helpers/bookHelpers';
 
 // ============================================================
 // KONSTANTA
@@ -249,6 +250,19 @@ const BookModal = ({
 
   // ✅ FIX: Image error handling di modal
   const [imgSrc, setImgSrc] = useState(book.image || PLACEHOLDER_IMAGE);
+  const [copied, setCopied] = useState(false);
+
+  const handleShare = async () => {
+    try {
+      const slug = generateBookSlug(book.id, book.title);
+      const url = `${window.location.origin}/buku/${slug}`;
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy text: ', err);
+    }
+  };
 
   // ✅ FIX: Sync imgSrc kalau activeBook berubah (klik rekomendasi)
   useEffect(() => {
@@ -298,14 +312,25 @@ const BookModal = ({
         aria-label={`Detail buku ${book.title}`}
         className="relative bg-white rounded-3xl shadow-2xl max-w-6xl w-full overflow-hidden flex flex-col md:flex-row max-h-[90vh]"
       >
-        {/* Tombol Close */}
-        <button
-          onClick={onClose}
-          aria-label="Tutup modal"
-          className="absolute top-4 right-4 z-10 p-2 bg-white/80 rounded-full hover:bg-white text-gray-500 hover:text-red-500 transition-colors shadow-sm"
-        >
-          <X className="w-6 h-6" />
-        </button>
+        {/* Tombol Aksi Kanan Atas */}
+        <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+          <button
+            onClick={handleShare}
+            aria-label="Bagikan buku"
+            className="flex items-center gap-1.5 px-3 py-2 bg-white/80 backdrop-blur rounded-full hover:bg-white text-gray-500 hover:text-[#8B5E3C] transition-colors shadow-sm text-xs font-bold"
+          >
+            {copied ? <Check className="w-4 h-4 text-green-500" /> : <Share2 className="w-4 h-4" />}
+            {copied ? <span className="text-green-500">Tersalin!</span> : 'Salin Link'}
+          </button>
+
+          <button
+            onClick={onClose}
+            aria-label="Tutup modal"
+            className="p-2 bg-white/80 backdrop-blur rounded-full hover:bg-white text-gray-500 hover:text-red-500 transition-colors shadow-sm"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        </div>
 
         {/* Kolom Kiri — Gambar */}
         <div className="w-full md:w-1/2 bg-gray-50 flex items-center justify-center p-6 md:p-8">

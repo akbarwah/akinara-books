@@ -5,7 +5,7 @@ import { supabase } from '../../supabaseClient';
 import {
   Calendar, Link as LinkIcon, Truck,
   CheckCircle, Circle, Plus, Trash2,
-  AlertCircle, Loader2
+  AlertCircle, Loader2, Edit3, X
 } from 'lucide-react';
 
 // ============================================================
@@ -45,6 +45,7 @@ export default function BannerManager() {
   const [targetDate, setTargetDate] = useState('');
   const [etaText, setEtaText] = useState('');
   const [waitlistLink, setWaitlistLink] = useState('');
+  const [isEditing, setIsEditing] = useState<number | null>(null);
 
   // ✅ Auto-dismiss notification setelah 4 detik
   useEffect(() => {
@@ -73,32 +74,66 @@ export default function BannerManager() {
     fetchBanners();
   }, [fetchBanners]);
 
-  // ✅ Tambah banner baru
-  const handleAddBanner = async (e: React.FormEvent) => {
+  // ✅ Tambah/Edit banner
+  const handleSaveBanner = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    const { error } = await supabase.from('banner_config').insert([
-      {
-        publisher_name: publisherName,
-        target_date: targetDate,
-        eta_text: etaText,
-        waitlist_link: waitlistLink,
-        is_active: false,
-      },
-    ]);
+    const payload = {
+      publisher_name: publisherName,
+      target_date: targetDate,
+      eta_text: etaText,
+      waitlist_link: waitlistLink,
+      is_active: isEditing ? undefined : false,
+    };
+
+    let error;
+    if (isEditing) {
+      const { error: updateError } = await supabase
+        .from('banner_config')
+        .update({
+          publisher_name: publisherName,
+          target_date: targetDate,
+          eta_text: etaText,
+          waitlist_link: waitlistLink,
+        })
+        .eq('id', isEditing);
+      error = updateError;
+    } else {
+      const { error: insertError } = await supabase.from('banner_config').insert([payload]);
+      error = insertError;
+    }
 
     if (error) {
       setNotification({ type: 'error', text: `Gagal: ${error.message}` });
     } else {
-      setNotification({ type: 'success', text: 'Banner berhasil ditambahkan!' });
-      setPublisherName('');
-      setTargetDate('');
-      setEtaText('');
-      setWaitlistLink('');
+      setNotification({ type: 'success', text: isEditing ? 'Banner berhasil diupdate!' : 'Banner berhasil ditambahkan!' });
+      resetForm();
       fetchBanners();
     }
     setIsSubmitting(false);
+  };
+
+  const resetForm = () => {
+    setPublisherName('');
+    setTargetDate('');
+    setEtaText('');
+    setWaitlistLink('');
+    setIsEditing(null);
+  };
+
+  const startEdit = (banner: BannerConfig) => {
+    setPublisherName(banner.publisher_name);
+    // targetDate dari DB biasanya dalam format ISO, parse ke YYYY-MM-DDTHH:mm untuk input datetime-local
+    const dt = new Date(banner.target_date);
+    const tzOffset = dt.getTimezoneOffset() * 60000; // offset in milliseconds
+    const localISOTime = (new Date(dt.getTime() - tzOffset)).toISOString().slice(0, 16);
+    
+    setTargetDate(localISOTime);
+    setEtaText(banner.eta_text || '');
+    setWaitlistLink(banner.waitlist_link || '');
+    setIsEditing(banner.id);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // ✅ Toggle aktif/nonaktif dengan loading per-item
@@ -159,14 +194,22 @@ export default function BannerManager() {
         </div>
       )}
 
-      {/* Form Tambah Banner */}
+      {/* Form Tambah/Edit Banner */}
       <form
-        onSubmit={handleAddBanner}
-        className="bg-slate-50 p-5 rounded-xl border border-slate-200 mb-8 space-y-4"
+        onSubmit={handleSaveBanner}
+        className={`${isEditing ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200'} p-5 rounded-xl border mb-8 space-y-4 transition-colors`}
       >
-        <h3 className="text-sm font-semibold text-slate-600 flex items-center gap-2 mb-3">
-          <Plus className="w-4 h-4" /> Buat Jadwal PO Baru
-        </h3>
+        <div className="flex justify-between items-center mb-3">
+          <h3 className={`text-sm font-semibold flex items-center gap-2 ${isEditing ? 'text-blue-600' : 'text-slate-600'}`}>
+            {isEditing ? <Edit3 className="w-4 h-4" /> : <Plus className="w-4 h-4" />} 
+            {isEditing ? 'Edit Jadwal PO' : 'Buat Jadwal PO Baru'}
+          </h3>
+          {isEditing && (
+            <button type="button" onClick={resetForm} className="text-xs text-slate-500 hover:text-slate-700 flex items-center gap-1">
+              <X className="w-3 h-3" /> Batal Edit
+            </button>
+          )}
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-bold text-slate-500 mb-1">
@@ -223,10 +266,10 @@ export default function BannerManager() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2 rounded-lg text-sm font-bold transition-colors disabled:opacity-50 flex items-center gap-2"
+            className={`${isEditing ? 'bg-blue-500 hover:bg-blue-600' : 'bg-orange-500 hover:bg-orange-600'} text-white px-5 py-2 rounded-lg text-sm font-bold transition-colors disabled:opacity-50 flex items-center gap-2`}
           >
             {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-            {isSubmitting ? 'Menyimpan...' : 'Simpan Draft PO'}
+            {isSubmitting ? 'Menyimpan...' : (isEditing ? 'Update Draft PO' : 'Simpan Draft PO')}
           </button>
         </div>
       </form>
@@ -333,13 +376,22 @@ export default function BannerManager() {
                         </button>
                       </div>
                     ) : (
-                      <button
-                        onClick={() => setConfirmDeleteId(banner.id)}
-                        className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        aria-label="Hapus banner"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => startEdit(banner)}
+                          className="p-2 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          aria-label="Edit banner"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteId(banner.id)}
+                          className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          aria-label="Hapus banner"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>

@@ -24,6 +24,7 @@ export type Book = {
   eta?: string;
   sticker_text?: string;
   is_highlight?: boolean;
+  slug?: string;
 };
 
 export type CartItem = Book & {

@@ -55,6 +55,17 @@ export const getSeriesPrefix = (title: string): string => {
     .join(' ');
 };
 
+export const generateBookSlug = (id: number | string, title: string): string => {
+  // Hanya ambil huruf, angka, spasi, dan dash
+  const cleanTitle = title
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, '') 
+    .replace(/\s+/g, '-') 
+    .replace(/-+/g, '-') 
+    .replace(/^-+|-+$/g, ''); // Hapus dash di awal/akhir
+  return `${id}-${cleanTitle}`;
+};
+
 export const STATUS_PRIORITY: { [key: string]: number } = {
   READY: 1,
   PO: 2,

@@ -13,7 +13,8 @@ import {
   Tag, Hash, User, Building2, Calendar,
   Clock, Image as ImageIcon, Globe, LogOut,
   Layers, Baby, BookText, RefreshCcw,
-  Download, Upload, Star, Loader2
+  Download, Upload, Star, Loader2, Package,
+  Truck, Wallet, TrendingUp, ArrowRight
 } from 'lucide-react';
 import { Sticker, Youtube } from 'lucide-react';
 import Link from 'next/link';
@@ -47,6 +48,17 @@ type Book = {
   sticker_text?: string;
 };
 
+interface OrderSummary {
+  total: number;
+  diproses: number;
+  dikirim: number;
+  delivered: number;
+  totalRevenue: number;
+  totalOutstanding: number;
+  lunas: number;
+  dp: number;
+}
+
 // ============================================================
 // KONSTANTA
 // ============================================================
@@ -55,10 +67,8 @@ const FORMAT_OPTIONS = [
   'Board Book', 'Hardback', 'Paperback',
   'Lift-the-Flap', 'Picture Book', 'Interactive', 'Sound Book'
 ];
-const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 menit
+const INACTIVITY_LIMIT = 10 * 60 * 1000;
 const MAX_HIGHLIGHTS = 4;
-
-// Kolom wajib yang harus ada di CSV
 const REQUIRED_CSV_COLUMNS = ['title', 'price', 'status'];
 
 const INITIAL_FORM: Book = {
@@ -68,12 +78,145 @@ const INITIAL_FORM: Book = {
   previewurl: '', is_highlight: false, sticker_text: '',
 };
 
+const EMPTY_ORDER_SUMMARY: OrderSummary = {
+  total: 0, diproses: 0, dikirim: 0, delivered: 0,
+  totalRevenue: 0, totalOutstanding: 0, lunas: 0, dp: 0,
+};
+
 // ============================================================
 // TIPE NOTIFIKASI
 // ============================================================
 interface AppNotification {
   type: 'success' | 'error';
   text: string;
+}
+
+// ============================================================
+// HELPER
+// ============================================================
+const formatRupiah = (num: number) => {
+  return new Intl.NumberFormat('id-ID', {
+    style: 'currency', currency: 'IDR', minimumFractionDigits: 0,
+  }).format(num);
+};
+
+// ============================================================
+// ORDER SUMMARY WIDGET COMPONENT
+// ============================================================
+function OrderSummaryWidget({ summary, loading }: { summary: OrderSummary; loading: boolean }) {
+  if (loading) {
+    return (
+      <div className="bg-white rounded-[2.5rem] border border-orange-100 shadow-sm p-8 animate-pulse">
+        <div className="h-5 w-48 bg-gray-200 rounded mb-6" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-24 bg-gray-100 rounded-2xl" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-[2.5rem] border border-orange-100 shadow-sm overflow-hidden">
+      {/* Header */}
+      <div className="px-8 pt-7 pb-4 flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-black text-[#8B5E3C] flex items-center gap-2">
+            <Package className="w-5 h-5 text-[#FF9E9E]" />
+            Ringkasan Pesanan
+          </h2>
+          <p className="text-xs text-gray-400 mt-0.5">Overview status semua pesanan</p>
+        </div>
+        <Link
+          href="/admin/orders"
+          className="flex items-center gap-1.5 text-xs font-bold text-[#FF9E9E] hover:text-[#ff8585] transition-colors group"
+        >
+          Lihat Semua
+          <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+        </Link>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="px-8 pb-7">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+          {/* Total Pesanan */}
+          <div className="bg-gradient-to-br from-[#8B5E3C] to-[#a0724f] p-4 rounded-2xl text-white relative overflow-hidden">
+            <div className="absolute -right-3 -top-3 w-16 h-16 bg-white/10 rounded-full blur-xl" />
+            <div className="relative">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-orange-200 mb-1">
+                Total Pesanan
+              </div>
+              <div className="text-3xl font-black">{summary.total}</div>
+            </div>
+          </div>
+
+          {/* Diproses */}
+          <Link
+            href="/admin/orders"
+            className="bg-blue-50 border border-blue-100 p-4 rounded-2xl hover:bg-blue-100 transition-colors group"
+          >
+            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-blue-400 mb-1">
+              <Clock className="w-3 h-3" /> Diproses
+            </div>
+            <div className="text-3xl font-black text-blue-600">{summary.diproses}</div>
+          </Link>
+
+          {/* Dikirim */}
+          <Link
+            href="/admin/orders"
+            className="bg-yellow-50 border border-yellow-100 p-4 rounded-2xl hover:bg-yellow-100 transition-colors group"
+          >
+            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-yellow-500 mb-1">
+              <Truck className="w-3 h-3" /> Dikirim
+            </div>
+            <div className="text-3xl font-black text-yellow-600">{summary.dikirim}</div>
+          </Link>
+
+          {/* Terkirim */}
+          <Link
+            href="/admin/orders"
+            className="bg-green-50 border border-green-100 p-4 rounded-2xl hover:bg-green-100 transition-colors group"
+          >
+            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-green-400 mb-1">
+              <CheckCircle className="w-3 h-3" /> Terkirim
+            </div>
+            <div className="text-3xl font-black text-green-600">{summary.delivered}</div>
+          </Link>
+        </div>
+
+        {/* Financial Row */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <div className="bg-[#FFF9F0] p-4 rounded-2xl border border-orange-100">
+            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">
+              <TrendingUp className="w-3 h-3" /> Total Omzet
+            </div>
+            <div className="text-lg font-black text-[#8B5E3C]">{formatRupiah(summary.totalRevenue)}</div>
+          </div>
+
+          <div className="bg-[#FFF9F0] p-4 rounded-2xl border border-orange-100">
+            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">
+              <Wallet className="w-3 h-3" /> Sisa Tagihan
+            </div>
+            <div className={`text-lg font-black ${summary.totalOutstanding > 0 ? 'text-red-500' : 'text-green-500'}`}>
+              {formatRupiah(summary.totalOutstanding)}
+            </div>
+          </div>
+
+          <div className="bg-[#FFF9F0] p-4 rounded-2xl border border-orange-100">
+            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">
+              <CheckCircle className="w-3 h-3" /> Pembayaran
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-black text-green-600">{summary.lunas} Lunas</span>
+              <span className="text-gray-300">|</span>
+              <span className="text-sm font-black text-orange-500">{summary.dp} DP</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ============================================================
@@ -86,23 +229,24 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-
-  // ✅ FIX: Notifikasi inline, bukan alert()
   const [notification, setNotification] = useState<AppNotification | null>(null);
-
-  // ✅ FIX: Konfirmasi delete inline, bukan confirm()
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
-
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // ✅ Auto-dismiss notifikasi setelah 4 detik
+  // Order Summary State
+  const [orderSummary, setOrderSummary] = useState<OrderSummary>(EMPTY_ORDER_SUMMARY);
+  const [orderSummaryLoading, setOrderSummaryLoading] = useState(true);
+
+  // ============================================================
+  // AUTO-DISMISS NOTIFIKASI
+  // ============================================================
   useEffect(() => {
     if (!notification) return;
     const timer = setTimeout(() => setNotification(null), 4000);
     return () => clearTimeout(timer);
   }, [notification]);
 
-  // ✅ ESC untuk tutup modal
+  // ESC untuk tutup modal
   useEffect(() => {
     if (!isModalOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -112,7 +256,7 @@ export default function AdminPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isModalOpen]);
 
-  // ✅ Kunci body scroll saat modal terbuka
+  // Kunci body scroll saat modal terbuka
   useEffect(() => {
     document.body.style.overflow = isModalOpen ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
@@ -127,7 +271,6 @@ export default function AdminPage() {
     const performLogout = async (reason: string) => {
       await supabase.auth.signOut();
       localStorage.removeItem('admin_last_active');
-      // ✅ FIX: Tidak pakai alert(), set notification sebelum redirect
       setNotification({ type: 'error', text: reason });
       setTimeout(() => router.push('/login'), 1500);
     };
@@ -142,7 +285,6 @@ export default function AdminPage() {
 
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-
       if (!session) {
         router.push('/login');
         return;
@@ -150,7 +292,6 @@ export default function AdminPage() {
 
       const lastActive = localStorage.getItem('admin_last_active');
       const now = Date.now();
-
       if (lastActive && now - parseInt(lastActive) > INACTIVITY_LIMIT) {
         await performLogout('Sesi berakhir (timeout). Silakan login kembali.');
         return;
@@ -159,8 +300,8 @@ export default function AdminPage() {
       localStorage.setItem('admin_last_active', now.toString());
       setIsChecking(false);
       fetchBooks();
+      fetchOrderSummary();
 
-      // Pasang listener aktivitas
       const events = ['mousemove', 'click', 'keypress', 'scroll'];
       events.forEach((e) => window.addEventListener(e, resetTimer));
       resetTimer();
@@ -176,7 +317,7 @@ export default function AdminPage() {
   }, [router]);
 
   // ============================================================
-  // DATA
+  // DATA FETCHING
   // ============================================================
   const fetchBooks = useCallback(async () => {
     setLoading(true);
@@ -187,6 +328,60 @@ export default function AdminPage() {
       setBooks(data || []);
     }
     setLoading(false);
+  }, []);
+
+  const fetchOrderSummary = useCallback(async () => {
+    setOrderSummaryLoading(true);
+    try {
+      // Pastikan session aktif sebelum query
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.warn('No active session, skipping order summary fetch');
+        setOrderSummaryLoading(false);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('orders')
+        .select('order_status, payment_status, total_amount, outstanding_amount');
+
+      if (error) {
+        // Log detail error untuk debugging
+        console.error('Order summary error:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+        });
+
+        // Jangan crash — tetap tampilkan widget dengan data kosong
+        setOrderSummary(EMPTY_ORDER_SUMMARY);
+        setOrderSummaryLoading(false);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        const summary: OrderSummary = {
+          total: data.length,
+          diproses: data.filter(
+            (o) => !o.order_status || o.order_status === 'Diproses' || o.order_status === 'Active'
+          ).length,
+          dikirim: data.filter((o) => o.order_status === 'Dikirim').length,
+          delivered: data.filter((o) => o.order_status === 'Delivered').length,
+          totalRevenue: data.reduce((sum, o) => sum + (o.total_amount || 0), 0),
+          totalOutstanding: data.reduce((sum, o) => sum + (o.outstanding_amount || 0), 0),
+          lunas: data.filter((o) => o.payment_status === 'Lunas').length,
+          dp: data.filter((o) => o.payment_status !== 'Lunas').length,
+        };
+        setOrderSummary(summary);
+      } else {
+        setOrderSummary(EMPTY_ORDER_SUMMARY);
+      }
+    } catch (err) {
+      console.error('Unexpected error fetching order summary:', err);
+      setOrderSummary(EMPTY_ORDER_SUMMARY);
+    }
+    setOrderSummaryLoading(false);
   }, []);
 
   const handleLogout = async () => {
@@ -242,7 +437,7 @@ export default function AdminPage() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    URL.revokeObjectURL(url); // ✅ FIX: Revoke URL setelah dipakai
+    URL.revokeObjectURL(url);
     setNotification({ type: 'success', text: 'Export berhasil!' });
   }, [books]);
 
@@ -270,7 +465,6 @@ export default function AdminPage() {
       complete: async (results) => {
         const rawData = results.data as Record<string, string>[];
 
-        // ✅ FIX: Validasi kolom wajib ada di CSV
         if (rawData.length === 0) {
           setNotification({ type: 'error', text: 'File CSV kosong.' });
           setLoading(false);
@@ -291,7 +485,6 @@ export default function AdminPage() {
           return;
         }
 
-        // Fetch data existing untuk deteksi update vs insert
         const { data: existingBooks, error: fetchError } = await supabase
           .from('books')
           .select('id, title, type');
@@ -339,7 +532,6 @@ export default function AdminPage() {
           };
         });
 
-        // Deduplikasi
         const uniqueMap = new Map();
         cleanData.forEach((item) => {
           if (item.title !== 'Tanpa Judul' && item.price > 0) {
@@ -398,12 +590,11 @@ export default function AdminPage() {
       },
     });
 
-    // Reset input
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   // ============================================================
-  // FILTER OPTIONS — type-safe
+  // FILTER OPTIONS
   // ============================================================
   const uniquePublishers = useMemo(
     () => [
@@ -501,10 +692,8 @@ export default function AdminPage() {
     setIsModalOpen(true);
   }, []);
 
-  // ✅ FIX: Validasi max 4 highlight — pakai notification bukan alert
   const handleHighlightChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const isTurningOn = e.target.checked;
-
     if (isTurningOn) {
       const currentCount = books.filter((b) => b.is_highlight).length;
       const isAlreadyActive = books.find(
@@ -519,7 +708,6 @@ export default function AdminPage() {
         return;
       }
     }
-
     setFormData({ ...formData, is_highlight: isTurningOn });
   };
 
@@ -587,7 +775,7 @@ export default function AdminPage() {
   };
 
   // ============================================================
-  // LOADING SCREEN (auth check)
+  // LOADING SCREEN
   // ============================================================
   if (isChecking) {
     return (
@@ -605,8 +793,6 @@ export default function AdminPage() {
   // ============================================================
   return (
     <div className="min-h-screen bg-[#FFF9F0] text-[#6D4C41] font-sans pb-20 overflow-x-hidden text-sm">
-
-      {/* Hidden file input untuk import */}
       <input
         type="file"
         accept=".csv"
@@ -615,9 +801,7 @@ export default function AdminPage() {
         className="hidden"
       />
 
-      {/* ============================================================ */}
-      {/* NAVBAR */}
-      {/* ============================================================ */}
+      {/* ===== NAVBAR ===== */}
       <header className="bg-[#FFF9F0]/90 backdrop-blur-md border-b border-orange-100 sticky top-0 z-40 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -652,6 +836,19 @@ export default function AdminPage() {
               <Download className="w-5 h-5" />
             </button>
 
+            <Link
+              href="/admin/orders"
+              className="bg-orange-100 hover:bg-orange-200 text-[#8B5E3C] px-6 py-2.5 rounded-full font-bold flex items-center gap-2 transition-all shadow-sm active:scale-95 relative"
+            >
+              <Package className="w-4 h-4" /> Orders
+              {/* Badge: jumlah pesanan aktif */}
+              {orderSummary.diproses + orderSummary.dikirim > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center shadow-sm">
+                  {orderSummary.diproses + orderSummary.dikirim}
+                </span>
+              )}
+            </Link>
+
             <button
               onClick={openAddModal}
               className="bg-[#FF9E9E] hover:bg-[#ff8585] text-white px-6 py-2.5 rounded-full font-bold flex items-center gap-2 transition-all shadow-md active:scale-95"
@@ -672,19 +869,15 @@ export default function AdminPage() {
         </div>
       </header>
 
-      {/* ============================================================ */}
-      {/* MAIN */}
-      {/* ============================================================ */}
+      {/* ===== MAIN ===== */}
       <main className="max-w-[96%] mx-auto py-8">
-
-        {/* ✅ Notifikasi inline — auto dismiss */}
+        {/* Notification */}
         {notification && (
           <div
-            className={`mb-6 p-4 rounded-2xl flex items-center gap-3 font-bold text-sm ${
-              notification.type === 'success'
-                ? 'bg-green-100 text-green-700'
-                : 'bg-red-100 text-red-700'
-            }`}
+            className={`mb-6 p-4 rounded-2xl flex items-center gap-3 font-bold text-sm ${notification.type === 'success'
+              ? 'bg-green-100 text-green-700'
+              : 'bg-red-100 text-red-700'
+              }`}
           >
             {notification.type === 'success' ? (
               <CheckCircle className="w-5 h-5 shrink-0" />
@@ -695,6 +888,16 @@ export default function AdminPage() {
           </div>
         )}
 
+        {/* ===== ORDER SUMMARY WIDGET ===== */}
+        <Reveal>
+          <div className="mb-10">
+            <OrderSummaryWidget
+              summary={orderSummary}
+              loading={orderSummaryLoading}
+            />
+          </div>
+        </Reveal>
+
         {/* Banner Manager */}
         <Reveal>
           <div className="mb-10">
@@ -702,9 +905,7 @@ export default function AdminPage() {
           </div>
         </Reveal>
 
-        {/* ============================================================ */}
-        {/* FILTER */}
-        {/* ============================================================ */}
+        {/* ===== FILTER ===== */}
         <Reveal>
           <section className="bg-white p-6 rounded-[2.5rem] border border-orange-100 shadow-sm mb-10">
             <div className="flex flex-col xl:flex-row gap-4 items-center">
@@ -761,9 +962,7 @@ export default function AdminPage() {
           </section>
         </Reveal>
 
-        {/* ============================================================ */}
-        {/* TABEL */}
-        {/* ============================================================ */}
+        {/* ===== TABEL BUKU ===== */}
         <div className="bg-white rounded-[2.5rem] border border-orange-100 shadow-sm overflow-x-auto">
           <table className="w-full text-left border-collapse whitespace-nowrap">
             <thead>
@@ -798,7 +997,6 @@ export default function AdminPage() {
 
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-5">
-                        {/* ✅ FIX: img dengan error handling */}
                         <div className="relative shrink-0">
                           <img
                             src={book.image || PLACEHOLDER_IMAGE}
@@ -853,13 +1051,12 @@ export default function AdminPage() {
 
                     <td className="px-6 py-4 text-center">
                       <span
-                        className={`px-4 py-1.5 rounded-full text-[10px] font-black tracking-widest shadow-sm ${
-                          book.status === 'READY'
-                            ? 'bg-green-100 text-green-700'
-                            : book.status === 'PO'
+                        className={`px-4 py-1.5 rounded-full text-[10px] font-black tracking-widest shadow-sm ${book.status === 'READY'
+                          ? 'bg-green-100 text-green-700'
+                          : book.status === 'PO'
                             ? 'bg-blue-100 text-blue-700'
                             : 'bg-slate-100 text-slate-600'
-                        }`}
+                          }`}
                       >
                         {book.status}
                       </span>
@@ -875,7 +1072,6 @@ export default function AdminPage() {
                           <Edit className="w-5 h-5" />
                         </button>
 
-                        {/* ✅ FIX: Konfirmasi inline, bukan confirm() */}
                         {confirmDeleteId === book.id ? (
                           <div className="flex items-center gap-1 bg-red-50 px-2 py-1 rounded-xl border border-red-200">
                             <span className="text-[10px] text-red-600 font-bold">Hapus?</span>
@@ -911,9 +1107,7 @@ export default function AdminPage() {
         </div>
       </main>
 
-      {/* ============================================================ */}
-      {/* MODAL FORM */}
-      {/* ============================================================ */}
+      {/* ===== MODAL FORM ===== */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
           <div
@@ -945,7 +1139,6 @@ export default function AdminPage() {
             <form onSubmit={handleSave} className="p-10 overflow-y-auto space-y-8">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
-                {/* Judul */}
                 <div className="md:col-span-2">
                   <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2">
                     <Tag className="w-3 h-3" /> Judul Lengkap Buku *
@@ -959,7 +1152,6 @@ export default function AdminPage() {
                   />
                 </div>
 
-                {/* Harga */}
                 <div>
                   <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2">
                     <Hash className="w-3 h-3" /> Harga Jual (Rp) *
@@ -974,7 +1166,6 @@ export default function AdminPage() {
                   />
                 </div>
 
-                {/* Format */}
                 <div>
                   <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2">
                     <BookOpenIcon className="w-3 h-3" /> Format / Material
@@ -990,7 +1181,6 @@ export default function AdminPage() {
                   </select>
                 </div>
 
-                {/* Status */}
                 <div>
                   <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2">
                     <Clock className="w-3 h-3" /> Status Katalog
@@ -1002,11 +1192,10 @@ export default function AdminPage() {
                   >
                     <option value="READY">READY STOCK</option>
                     <option value="PO">PRE-ORDER</option>
-                                        <option value="BACKLIST">BACKLIST</option>
+                    <option value="BACKLIST">BACKLIST</option>
                   </select>
                 </div>
 
-                {/* Kategori */}
                 <div>
                   <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2">
                     <Filter className="w-3 h-3" /> Jenis / Asal
@@ -1021,7 +1210,6 @@ export default function AdminPage() {
                   </select>
                 </div>
 
-                {/* Penulis */}
                 <div>
                   <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2">
                     <User className="w-3 h-3" /> Penulis / Kreator
@@ -1034,7 +1222,6 @@ export default function AdminPage() {
                   />
                 </div>
 
-                {/* Penerbit */}
                 <div>
                   <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2">
                     <Building2 className="w-3 h-3" /> Penerbit / Publisher
@@ -1047,7 +1234,6 @@ export default function AdminPage() {
                   />
                 </div>
 
-                {/* Usia */}
                 <div>
                   <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2">
                     <Baby className="w-3 h-3" /> Rekomendasi Usia
@@ -1061,7 +1247,6 @@ export default function AdminPage() {
                   />
                 </div>
 
-                {/* Preview URL */}
                 <div>
                   <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2">
                     <Youtube className="w-3 h-3" /> Preview URL (Video)
@@ -1075,7 +1260,6 @@ export default function AdminPage() {
                   />
                 </div>
 
-                {/* ETA */}
                 <div>
                   <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2">
                     <Calendar className="w-3 h-3" /> Estimasi Kedatangan (ETA)
@@ -1088,7 +1272,6 @@ export default function AdminPage() {
                   />
                 </div>
 
-                {/* Spesifikasi */}
                 <div>
                   <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2">
                     <BookText className="w-3 h-3" /> Spesifikasi Halaman
@@ -1102,7 +1285,6 @@ export default function AdminPage() {
                   />
                 </div>
 
-                {/* Link Gambar */}
                 <div className="md:col-span-2">
                   <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2">
                     <ImageIcon className="w-3 h-3" /> Link Cover Gambar Utama *
@@ -1117,10 +1299,10 @@ export default function AdminPage() {
                   />
                 </div>
 
-                {/* Deskripsi */}
                 <div className="md:col-span-3">
                   <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2">
-                    <Globe className="w-3 h-3" /> Deskripsi Lengkap / Sinopsis
+                    <Globe className="w-3 h-3" />
+                    Deskripsi Lengkap / Sinopsis
                   </label>
                   <textarea
                     rows={4}

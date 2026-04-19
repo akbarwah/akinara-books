@@ -1,19 +1,38 @@
-// app/sitemap.ts
-import type { MetadataRoute } from 'next'
+import { supabase } from '../supabaseClient';
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap() {
+  // Fetch all book slugs
+  const { data: books } = await supabase
+    .from('books')
+    .select('slug, id')
+    .order('id', { ascending: false });
+
+  const bookUrls = (books || []).map((book) => ({
+    url: `https://akinara.com/katalog/${book.slug}`,
+    lastModified: new Date(),
+    changeFrequency: 'weekly' as const,
+    priority: 0.8,
+  }));
+
   return [
     {
-      url: 'https://akinarabooks.my.id',
+      url: 'https://akinara.com',
       lastModified: new Date(),
-      changeFrequency: 'weekly',
+      changeFrequency: 'daily' as const,
       priority: 1,
     },
     {
-      url: 'https://akinarabooks.my.id/katalog',
+      url: 'https://akinara.com/katalog',
       lastModified: new Date(),
-      changeFrequency: 'daily',
-      priority: 0.8,
+      changeFrequency: 'daily' as const,
+      priority: 0.9,
     },
-  ]
+    {
+      url: 'https://akinara.com/cek-pesanan',
+      lastModified: new Date(),
+      changeFrequency: 'monthly' as const,
+      priority: 0.5,
+    },
+    ...bookUrls,
+  ];
 }

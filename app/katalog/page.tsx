@@ -31,20 +31,22 @@ function groupBooks(books: Book[]): { title: string; books: Book[] }[] {
 }
 
 export default async function KatalogPage() {
-  // ✅ Fetch di server
+  // ✅ Fetch di server — select('*') sudah include slug
   const { data, error } = await supabase.from('books').select('*');
 
   const books: Book[] = error || !data
     ? []
     : [...data].sort((a, b) => {
-        const pA = STATUS_PRIORITY[a.status] ?? 99;
-        const pB = STATUS_PRIORITY[b.status] ?? 99;
-        if (pA !== pB) return pA - pB;
-        return a.id - b.id;
-      });
+      const pA = STATUS_PRIORITY[a.status] ?? 99;
+      const pB = STATUS_PRIORITY[b.status] ?? 99;
+      if (pA !== pB) return pA - pB;
+      return a.id - b.id;
+    });
 
   // ✅ Group buku untuk schema
   const bookGroups = groupBooks(books);
+
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://akinarabooks.my.id';
 
   // ✅ Generate ItemList Schema
   const itemListSchema = {
@@ -53,7 +55,7 @@ export default async function KatalogPage() {
     name: 'Katalog Buku Anak Akinara Books',
     description:
       'Koleksi lengkap buku anak import dan lokal pilihan terbaik di Akinara Books.',
-    url: 'https://akinarabooks.my.id/katalog',
+    url: `${siteUrl}/katalog`,
     numberOfItems: bookGroups.length,
     itemListElement: bookGroups.map((group, index) => {
       const displayBook = group.books[0];
@@ -62,36 +64,45 @@ export default async function KatalogPage() {
       const maxPrice = Math.max(...prices);
       const hasVariants = group.books.length > 1;
 
+      // ✅ URL per buku pakai slug (jika ada)
+      const bookUrl = displayBook.slug
+        ? `${siteUrl}/katalog/${displayBook.slug}`
+        : `${siteUrl}/katalog`;
+
       return {
         '@type': 'ListItem',
         position: index + 1,
         item: {
           '@type': 'Book',
           name: displayBook.title,
-          ...(displayBook.author && { author: {
-            '@type': 'Person',
-            name: displayBook.author,
-          }}),
-          ...(displayBook.publisher && { publisher: {
-            '@type': 'Organization',
-            name: displayBook.publisher,
-          }}),
+          ...(displayBook.author && {
+            author: {
+              '@type': 'Person',
+              name: displayBook.author,
+            }
+          }),
+          ...(displayBook.publisher && {
+            publisher: {
+              '@type': 'Organization',
+              name: displayBook.publisher,
+            }
+          }),
           ...(displayBook.image && { image: displayBook.image }),
           ...(displayBook.description && { description: displayBook.description }),
           inLanguage: displayBook.category === 'Impor' ? 'en' : 'id',
-          url: 'https://akinarabooks.my.id/katalog',
+          url: bookUrl, // ✅ Sekarang pakai slug
           offers: {
             '@type': hasVariants ? 'AggregateOffer' : 'Offer',
             priceCurrency: 'IDR',
             ...(hasVariants
               ? {
-                  lowPrice: minPrice,
-                  highPrice: maxPrice,
-                  offerCount: group.books.length,
-                }
+                lowPrice: minPrice,
+                highPrice: maxPrice,
+                offerCount: group.books.length,
+              }
               : {
-                  price: minPrice,
-                }),
+                price: minPrice,
+              }),
             availability: getAvailability(displayBook.status),
             seller: {
               '@type': 'Organization',

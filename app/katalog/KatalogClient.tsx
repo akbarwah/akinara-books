@@ -216,11 +216,10 @@ const Pagination = ({
             onClick={() => onPageChange(number)}
             aria-label={`Halaman ${number}`}
             aria-current={currentPage === number ? 'page' : undefined}
-            className={`w-10 h-10 rounded-full font-bold text-sm transition-all shrink-0 ${
-              currentPage === number
+            className={`w-10 h-10 rounded-full font-bold text-sm transition-all shrink-0 ${currentPage === number
                 ? 'bg-[#8B5E3C] text-white shadow-lg scale-110'
                 : 'bg-white text-[#8B5E3C] border border-orange-100 hover:bg-orange-50'
-            }`}
+              }`}
           >
             {number}
           </button>
@@ -250,6 +249,9 @@ const Pagination = ({
 // ============================================================
 // KOMPONEN: BOOK GRID CARD
 // ============================================================
+// ============================================================
+// KOMPONEN: BOOK GRID CARD (UPDATED — Link instead of onClick)
+// ============================================================
 const BookGridCard = ({
   group,
   onClick,
@@ -266,17 +268,17 @@ const BookGridCard = ({
     displayBook.image || PLACEHOLDER_IMAGE
   );
 
-  return (
-    <div
-      onClick={() => onClick(group)}
-      className="group relative bg-white p-3 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-2 cursor-pointer border border-transparent hover:border-orange-100 h-full flex flex-col"
-    >
+  // Jika buku punya slug, gunakan <Link> ke halaman detail
+  // Jika tidak (fallback), gunakan onClick untuk modal
+  const slug = displayBook.slug;
+
+  const cardContent = (
+    <>
       {displayBook.sticker_text && (
         <StickerBadge type={displayBook.sticker_text} />
       )}
 
       <div className="aspect-3/4 rounded-xl overflow-hidden mb-4 relative bg-gray-100">
-        {/* ✅ Alt text lebih deskriptif untuk SEO */}
         <img
           src={imgSrc}
           alt={`Cover buku ${displayBook.title}${displayBook.author ? ` karya ${displayBook.author}` : ''}${displayBook.category ? ` - ${displayBook.category}` : ''}`}
@@ -333,21 +335,40 @@ const BookGridCard = ({
         </div>
       </div>
 
-      {/* ✅ h2 untuk struktur heading yang lebih baik */}
       <h2 className="font-bold text-[#8B5E3C] mb-1 line-clamp-2 leading-tight text-left grow text-sm">
         {displayBook.title}
       </h2>
       <div className="mt-2">
         <p className="text-[#FF9E9E] font-bold text-lg">
           {hasVariants && (
-            <span className="text-sm text-gray-400 font-normal mr-1">
-              Mulai
-            </span>
+            <span className="text-sm text-gray-400 font-normal mr-1">Mulai</span>
           )}
           Rp {minPrice.toLocaleString('id-ID')}
         </p>
         <p className="text-xs text-gray-400 mb-1">{displayBook.category}</p>
       </div>
+    </>
+  );
+
+  // Jika ada slug → Link ke halaman detail (SEO friendly)
+  if (slug) {
+    return (
+      <Link
+        href={`/katalog/${slug}`}
+        className="group relative bg-white p-3 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-2 border border-transparent hover:border-orange-100 h-full flex flex-col"
+      >
+        {cardContent}
+      </Link>
+    );
+  }
+
+  // Fallback: onClick untuk modal (jika slug belum ada)
+  return (
+    <div
+      onClick={() => onClick(group)}
+      className="group relative bg-white p-3 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-2 cursor-pointer border border-transparent hover:border-orange-100 h-full flex flex-col"
+    >
+      {cardContent}
     </div>
   );
 };
