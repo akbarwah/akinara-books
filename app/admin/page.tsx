@@ -5,6 +5,7 @@ import React, {
   useRef, useCallback
 } from 'react';
 import { supabase } from '../../supabaseClient';
+import { generateSlug } from '../utils/slug';
 import Papa from 'papaparse';
 import {
   ArrowLeft, Save, Plus, Edit, Trash2,
@@ -231,6 +232,7 @@ export default function AdminPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [notification, setNotification] = useState<AppNotification | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [importOverwrite, setImportOverwrite] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Order Summary State
@@ -513,6 +515,7 @@ export default function AdminPage() {
           return {
             id: existingId,
             title: cleanTitle,
+            slug: generateSlug(cleanTitle, cleanType),
             price: row.price
               ? parseInt(String(row.price).replace(/[^0-9]/g, ''))
               : 0,
@@ -543,10 +546,16 @@ export default function AdminPage() {
         const finalPayload = Array.from(uniqueMap.values());
         const toInsert: Record<string, unknown>[] = [];
         const toUpdate: Record<string, unknown>[] = [];
+        let skippedCount = 0;
 
         finalPayload.forEach((item) => {
           if (item.id) {
-            toUpdate.push(item);
+            // Hanya update jika overwrite diaktifkan
+            if (importOverwrite) {
+              toUpdate.push(item);
+            } else {
+              skippedCount++;
+            }
           } else {
             const { id, ...withoutId } = item;
             toInsert.push(withoutId);
@@ -572,9 +581,11 @@ export default function AdminPage() {
         if (errors.length > 0) {
           setNotification({ type: 'error', text: errors.join(' | ') });
         } else if (insertCount + updateCount > 0) {
+          const parts = [`${insertCount} buku baru`, `${updateCount} diupdate`];
+          if (skippedCount > 0) parts.push(`${skippedCount} dilewati`);
           setNotification({
             type: 'success',
-            text: `Import berhasil! ${insertCount} buku baru, ${updateCount} buku diupdate.`,
+            text: `Import berhasil! ${parts.join(', ')}.`,
           });
           fetchBooks();
         } else {
@@ -719,8 +730,10 @@ export default function AdminPage() {
     setIsSaving(true);
 
     try {
+      const bookTitle = formData.title || 'Tanpa Judul';
       const payload = {
-        title: formData.title || 'Tanpa Judul',
+        title: bookTitle,
+        slug: generateSlug(bookTitle, formData.type || 'Board Book'),
         price: formData.price ? parseInt(formData.price.toString()) : 0,
         type: formData.type || 'Board Book',
         age: formData.age || '',
@@ -818,14 +831,31 @@ export default function AdminPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <button
-              onClick={handleImportClick}
-              title="Import CSV"
-              aria-label="Import CSV"
-              className="p-2.5 bg-white border border-green-200 text-green-600 hover:bg-green-50 rounded-full transition-all shadow-sm"
-            >
-              <Upload className="w-5 h-5" />
-            </button>
+            {/* Import CSV + Overwrite Toggle */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleImportClick}
+                title="Import CSV"
+                aria-label="Import CSV"
+                className="p-2.5 bg-white border border-green-200 text-green-600 hover:bg-green-50 rounded-full transition-all shadow-sm"
+              >
+                <Upload className="w-5 h-5" />
+              </button>
+              <label
+                className="flex items-center gap-1.5 cursor-pointer select-none group"
+                title="Jika dicentang, buku yang sudah ada di database akan di-overwrite saat import CSV"
+              >
+                <input
+                  type="checkbox"
+                  checked={importOverwrite}
+                  onChange={(e) => setImportOverwrite(e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500 accent-green-600 cursor-pointer"
+                />
+                <span className="text-[11px] font-bold text-gray-400 group-hover:text-gray-600 transition-colors whitespace-nowrap">
+                  Overwrite
+                </span>
+              </label>
+            </div>
 
             <button
               onClick={handleExportCSV}
