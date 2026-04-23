@@ -380,18 +380,43 @@ function KatalogContent({ initialBooks }: { initialBooks: Book[] }) {
   const [books] = useState<Book[]>(initialBooks); // ✅ Tidak perlu fetch lagi
   const [selectedGroup, setSelectedGroup] = useState<BookGroup | null>(null);
 
-  const [filterSearch, setFilterSearch] = useState('');
-  const [filterStatus, setFilterStatus] = useState('Semua');
-  const [filterCategory, setFilterCategory] = useState('Semua');
-  const [filterAge, setFilterAge] = useState('Semua');
-  const [filterType, setFilterType] = useState('Semua');
-  const [filterPublisher, setFilterPublisher] = useState('Semua');
+  // ✅ Restore filter terakhir dari sessionStorage
+  const savedFilters = typeof window !== 'undefined'
+    ? JSON.parse(sessionStorage.getItem('katalog_filters') || 'null')
+    : null;
+
+  const [filterSearch, setFilterSearch] = useState(savedFilters?.search || '');
+  const [filterStatus, setFilterStatus] = useState(savedFilters?.status || 'Semua');
+  const [filterCategory, setFilterCategory] = useState(savedFilters?.category || 'Semua');
+  const [filterAge, setFilterAge] = useState(savedFilters?.age || 'Semua');
+  const [filterType, setFilterType] = useState(savedFilters?.type || 'Semua');
+  const [filterPublisher, setFilterPublisher] = useState(savedFilters?.publisher || 'Semua');
 
   const router = useRouter();
   const searchParams = useSearchParams();
   const topRef = useRef<HTMLDivElement>(null);
   const currentPage = Number(searchParams.get('page')) || 1;
   const { getCartCount, setIsCartOpen } = useCart();
+
+  // ✅ Publisher param dari banner PO (override sessionStorage)
+  const publisherParam = searchParams.get('publisher');
+  React.useEffect(() => {
+    if (publisherParam) {
+      setFilterPublisher(publisherParam);
+    }
+  }, [publisherParam]);
+
+  // ✅ Simpan filter ke sessionStorage setiap kali berubah
+  React.useEffect(() => {
+    sessionStorage.setItem('katalog_filters', JSON.stringify({
+      search: filterSearch,
+      status: filterStatus,
+      category: filterCategory,
+      age: filterAge,
+      type: filterType,
+      publisher: filterPublisher,
+    }));
+  }, [filterSearch, filterStatus, filterCategory, filterAge, filterType, filterPublisher]);
 
   // Reset ke page 1 saat filter berubah
   const handleResetFilters = useCallback(() => {
@@ -401,6 +426,7 @@ function KatalogContent({ initialBooks }: { initialBooks: Book[] }) {
     setFilterAge('Semua');
     setFilterType('Semua');
     setFilterPublisher('Semua');
+    sessionStorage.removeItem('katalog_filters');
     router.push('?page=1', { scroll: false });
   }, [router]);
 

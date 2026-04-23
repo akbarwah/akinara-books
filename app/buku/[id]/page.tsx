@@ -62,10 +62,10 @@ const getEmbedUrl = (url: string): string | null => {
     return `https://www.youtube.com/embed/${videoId}`;
   }
   if (url.includes('instagram.com')) {
+    // PERBAIKAN INSTAGRAM: Cukup buang parameter ?utm_source dll, lalu tambah /embed/
     let cleanUrl = url.split('?')[0];
     if (cleanUrl.endsWith('/')) cleanUrl = cleanUrl.slice(0, -1);
-    cleanUrl = cleanUrl.replace('/reel/', '/p/');
-    return `${cleanUrl}/embed`;
+    return `${cleanUrl}/embed/`;
   }
   return url;
 };
@@ -177,7 +177,7 @@ export default function BookDetailPage({
 }) {
   const { addToCart } = useCart();
   const [bookId, setBookId] = useState<string | null>(null);
-  
+
   const [book, setBook] = useState<Book | null>(null);
   const [allBooks, setAllBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
@@ -199,14 +199,14 @@ export default function BookDetailPage({
 
     async function fetchBookData() {
       setLoading(true);
-      
+
       // Ambil buku spesifik
       const { data: specificBookData, error: specificError } = await supabase
         .from('books')
         .select('*')
         .eq('id', bookId)
         .single();
-        
+
       if (specificBookData) {
         setBook(specificBookData as unknown as Book);
         setImgSrc((specificBookData.image as string) || PLACEHOLDER_IMAGE);
@@ -217,11 +217,11 @@ export default function BookDetailPage({
         .from('books')
         .select('*')
         .limit(50);
-        
+
       if (allBooksData) {
         setAllBooks(allBooksData as unknown as Book[]);
       }
-      
+
       setLoading(false);
     }
 
@@ -309,28 +309,28 @@ export default function BookDetailPage({
   return (
     <div className="min-h-screen bg-[#FFF9F0] flex flex-col font-sans overflow-x-hidden">
       <Navbar />
-      
+
       <main className="flex-1 pt-8 pb-20">
         <div className="max-w-6xl mx-auto px-4">
-          
+
           {/* Breadcrumb & Navigation */}
           <div className="flex items-center justify-between xl:justify-start gap-4 mb-6 text-sm">
             <Link href="/" className="inline-flex items-center gap-2 text-gray-500 hover:text-orange-500 transition-colors font-bold">
               <ArrowLeft className="w-4 h-4" /> Kembali
             </Link>
-            
+
             <div className="hidden xl:flex items-center gap-2 text-gray-400">
               <span>/</span>
               <Link href="/" className="hover:text-orange-500 transition-colors">Katalog</Link>
               <span>/</span>
               <span className="text-[#8B5E3C] font-bold truncate max-w-md">{book.title}</span>
             </div>
-            
-            <button 
+
+            <button
               onClick={handleShare}
               className="ml-auto inline-flex items-center gap-2 px-4 py-2 bg-white border border-orange-100 rounded-full font-bold text-[#8B5E3C] hover:bg-orange-50 transition-colors shadow-sm relative"
             >
-              <Share2 className="w-4 h-4" /> 
+              <Share2 className="w-4 h-4" />
               {copied ? 'Tersalin!' : 'Bagikan'}
             </button>
           </div>
@@ -355,7 +355,7 @@ export default function BookDetailPage({
 
             {/* Kolom Kanan — Detail */}
             <div className="w-full md:w-7/12 lg:w-1/2 flex flex-col relative z-10">
-              
+
               {/* Status Badges */}
               <div className="flex flex-wrap gap-2 mb-4">
                 <StatusBadge status={book.status} size="md" />
@@ -371,7 +371,7 @@ export default function BookDetailPage({
               <h1 className="text-3xl md:text-5xl font-black text-[#8B5E3C] mb-3 leading-tight">
                 {book.title}
               </h1>
-              
+
               <div className="mb-8">
                 <p className="text-3xl md:text-4xl font-black text-[#FF9E9E]">
                   Rp {(book.price ?? 0).toLocaleString('id-ID')}
@@ -386,8 +386,8 @@ export default function BookDetailPage({
                     {book.status === 'READY'
                       ? '✓ Tersedia (Ready Stock)'
                       : book.status === 'PO'
-                      ? '⏳ Pre-Order'
-                      : '🚫 Belum Masuk Batch PO'}
+                        ? '⏳ Pre-Order'
+                        : '🚫 Belum Masuk Batch PO'}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
@@ -452,26 +452,25 @@ export default function BookDetailPage({
 
           {/* Section Bawah: Preview & Rekomendasi */}
           <div className="mt-12 grid grid-cols-1 lg:grid-cols-2 gap-12">
-            
+
             {/* Kiri: Video Preview */}
             <div>
               <h4 className="text-xl font-black text-[#8B5E3C] mb-6 flex items-center gap-2 border-b border-orange-100 pb-4">
-                <Eye className="w-6 h-6 text-[#FF9E9E]" /> Sneak Peek Video
+                <Eye className="w-6 h-6 text-[#FF9E9E]" /> Preview Buku
               </h4>
-              
+
               {book.previewurl && isEmbeddable(book.previewurl) ? (
                 <div
-                  className={`relative w-full rounded-3xl overflow-hidden shadow-lg border border-orange-100 bg-white ${
-                    book.previewurl.includes('instagram') ? 'h-[600px]' : 'aspect-video'
-                  }`}
+                  className={`relative w-full rounded-3xl overflow-hidden shadow-lg border border-orange-100 bg-white ${book.previewurl.includes('instagram') ? 'h-[600px]' : 'aspect-video'
+                    }`}
                 >
                   <iframe
                     className="absolute inset-0 w-full h-full"
                     src={getEmbedUrl(book.previewurl) as string}
                     title={`Preview buku ${book.title}`}
                     loading="lazy"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
-                    sandbox="allow-scripts allow-same-origin allow-presentation"
+                    /* HAPUS ATRIBUT SANDBOX DI SINI, BIARKAN INSTAGRAM BERNAPAS */
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen
                   />
                 </div>
@@ -488,14 +487,14 @@ export default function BookDetailPage({
               <h4 className="text-xl font-black text-[#8B5E3C] mb-6 flex items-center gap-2 border-b border-orange-100 pb-4">
                 <Sparkles className="w-6 h-6 text-yellow-500" /> Rekomendasi Serupa
               </h4>
-              
+
               {relatedBooks.length > 0 ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                   {relatedBooks.map((relBook) => {
                     const slug = generateBookSlug(relBook.id, relBook.title);
                     return (
-                      <Link 
-                        key={relBook.id} 
+                      <Link
+                        key={relBook.id}
                         href={`/buku/${slug}`}
                         className="group bg-white p-3 rounded-2xl shadow-sm hover:shadow-md transition-all border border-transparent hover:border-orange-100 flex flex-col h-full"
                       >
@@ -524,7 +523,7 @@ export default function BookDetailPage({
                 <p className="text-gray-400">Belum ada rekomendasi yang mirip dengan buku ini.</p>
               )}
             </div>
-            
+
           </div>
         </div>
       </main>

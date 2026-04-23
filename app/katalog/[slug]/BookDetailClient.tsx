@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import Script from 'next/script';
 import {
     ShoppingBag, Truck, Clock, Bookmark,
     MessageCircle, Eye, User, Building2, Book as BookIcon, Globe,
     ArrowLeft, Share2, Sparkles, Copy, Check,
-    ChevronRight, Play, ExternalLink
+    ChevronRight, Play, ExternalLink, ArrowRight
 } from 'lucide-react';
 import { useCart } from '@/app/context/CartContext';
 import Link from 'next/link';
@@ -33,12 +34,22 @@ const getWaLink = (book: Book): string => {
     return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
 };
 
+const isInstagramPost = (url: string): boolean => {
+    if (!url || !url.includes('instagram.com')) return false;
+    return url.includes('/p/');
+};
+
+const isInstagramReel = (url: string): boolean => {
+    if (!url || !url.includes('instagram.com')) return false;
+    return url.includes('/reel/') || url.includes('/reels/');
+};
+
 const isEmbeddable = (url: string): boolean => {
     if (!url) return false;
     return (
         url.includes('youtube.com') ||
         url.includes('youtu.be') ||
-        url.includes('instagram.com')
+        isInstagramPost(url)
     );
 };
 
@@ -52,13 +63,14 @@ const getEmbedUrl = (url: string): string | null => {
             videoId = url.split('v=')[1]?.split('&')[0] || '';
         } else if (url.includes('/embed/')) {
             return url;
+        } else if (url.includes('/shorts/')) {
+            videoId = url.split('/shorts/')[1]?.split('?')[0] || '';
         }
         return `https://www.youtube.com/embed/${videoId}`;
     }
-    if (url.includes('instagram.com')) {
+    if (isInstagramPost(url)) {
         let cleanUrl = url.split('?')[0];
         if (cleanUrl.endsWith('/')) cleanUrl = cleanUrl.slice(0, -1);
-        cleanUrl = cleanUrl.replace('/reel/', '/p/');
         return `${cleanUrl}/embed`;
     }
     return url;
@@ -115,6 +127,13 @@ export default function BookDetailClient({
         setActiveVariant(variant);
         setImgSrc(variant.image || PLACEHOLDER_IMAGE);
     };
+
+    // ✅ BARU: Trigger Instagram Embed reload
+    useEffect(() => {
+        if (typeof window !== 'undefined' && (window as any).instgrm) {
+            (window as any).instgrm.Embeds.process();
+        }
+    }, [activeVariant?.previewurl]);
 
     const isBacklisted =
         activeVariant.status === 'BACKLIST' ||
@@ -213,19 +232,6 @@ export default function BookDetailClient({
                                     onError={() => setImgSrc(PLACEHOLDER_IMAGE)}
                                 />
                             </div>
-
-                            {/* Preview button */}
-                            {activeVariant.previewurl && (
-                                <a
-                                    href={activeVariant.previewurl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="mt-4 flex items-center justify-center gap-2 w-full py-3 bg-orange-50 hover:bg-orange-100 text-[#8B5E3C] rounded-2xl font-bold text-sm transition-colors border border-orange-100"
-                                >
-                                    <Play className="w-4 h-4" /> Lihat Preview Video
-                                    <ExternalLink className="w-3 h-3" />
-                                </a>
-                            )}
                         </div>
 
                         {/* --- Right: Detail --- */}
@@ -265,7 +271,6 @@ export default function BookDetailClient({
                                     <div className="flex flex-wrap gap-2">
                                         {variants.map((variant) => {
                                             const isActive = activeVariant.id === variant.id;
-                                            const isAvailable = variant.status === 'READY' || variant.status === 'PO';
 
                                             return (
                                                 <button
@@ -403,25 +408,59 @@ export default function BookDetailClient({
                         {/* Video Preview */}
                         <div>
                             <h4 className="text-xl font-black text-[#8B5E3C] mb-6 flex items-center gap-2 border-b border-orange-100 pb-4">
-                                <Eye className="w-6 h-6 text-[#FF9E9E]" /> Sneak Peek Video
+                                <Eye className="w-6 h-6 text-[#FF9E9E]" /> Preview Buku
                             </h4>
 
-                            {activeVariant.previewurl && isEmbeddable(activeVariant.previewurl) ? (
-                                <div
-                                    className={`relative w-full rounded-3xl overflow-hidden shadow-lg border border-orange-100 bg-white ${activeVariant.previewurl.includes('instagram') ? 'h-[600px]' : 'aspect-video'
-                                        }`}
-                                >
-                                    <iframe
-                                        className="absolute inset-0 w-full h-full"
-                                        src={getEmbedUrl(activeVariant.previewurl) as string}
-                                        title={`Preview buku ${activeVariant.title}`}
-                                        loading="lazy"
-                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
-                                        sandbox="allow-scripts allow-same-origin allow-presentation"
-                                        allowFullScreen
-                                    />
-                                </div>
+                            {activeVariant.previewurl ? (
+                                activeVariant.previewurl.includes('instagram') ? (
+                                    /* RENDER KHUSUS INSTAGRAM (NATIVE & ANTI-BLOKIR) */
+                                    <div className="w-full bg-white rounded-3xl overflow-hidden shadow-lg border border-orange-100 flex justify-center p-0">
+                                        <blockquote
+                                            className="instagram-media"
+                                            data-instgrm-permalink={`${activeVariant.previewurl.split('?')[0]}?utm_source=ig_embed&utm_campaign=loading`}
+                                            data-instgrm-version="14"
+                                            style={{
+                                                background: '#FFF',
+                                                border: '0',
+                                                margin: '0',
+                                                maxWidth: '100%',
+                                                minWidth: '100%',
+                                                padding: '0',
+                                                width: '100%'
+                                            }}
+                                        ></blockquote>
+                                        {/* SCRIPT RESMI INSTAGRAM */}
+                                        <Script
+                                            src="https://www.instagram.com/embed.js"
+                                            strategy="lazyOnload"
+                                            onLoad={() => {
+                                                if (typeof window !== 'undefined' && (window as any).instgrm) {
+                                                    (window as any).instgrm.Embeds.process();
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                ) : isEmbeddable(activeVariant.previewurl) ? (
+                                    /* RENDER KHUSUS YOUTUBE/LAINNYA (TETAP PAKAI IFRAME) */
+                                    <div className="relative w-full rounded-3xl overflow-hidden shadow-lg border border-orange-100 aspect-video">
+                                        <iframe
+                                            className="absolute inset-0 w-full h-full"
+                                            src={getEmbedUrl(activeVariant.previewurl) as string}
+                                            title={`Preview buku ${activeVariant.title}`}
+                                            loading="lazy"
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                            allowFullScreen
+                                        />
+                                    </div>
+                                ) : (
+                                    /* FALLBACK JIKA URL TIDAK DIKENALI */
+                                    <div className="bg-orange-50/50 rounded-3xl border border-orange-100/50 p-12 text-center flex flex-col items-center justify-center text-gray-400 h-[300px]">
+                                        <Eye className="w-12 h-12 mb-4 text-orange-200" />
+                                        <p className="font-medium">Video preview tidak dapat dimuat</p>
+                                    </div>
+                                )
                             ) : (
+                                /* STATE JIKA TIDAK ADA VIDEO SAMA SEKALI */
                                 <div className="bg-orange-50/50 rounded-3xl border border-orange-100/50 p-12 text-center flex flex-col items-center justify-center text-gray-400 h-[300px]">
                                     <Eye className="w-12 h-12 mb-4 text-orange-200" />
                                     <p className="font-medium">Video preview belum tersedia</p>

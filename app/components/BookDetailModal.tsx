@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   X, Eye, User, Building2, Book as BookIcon,
-  Globe, MessageCircle, ShoppingBag, ArrowRight, Sparkles, Share2, Check
+  Globe, MessageCircle, ShoppingBag, ArrowRight, Sparkles, Share2, Check, Play, ExternalLink, Youtube
 } from 'lucide-react';
 import type { Book } from '@/app/types/book';
 import { useCart } from '../context/CartContext';
@@ -11,9 +11,10 @@ import {
   PLACEHOLDER_IMAGE,
   getWaLink,
   isEmbeddable,
+  isInstagramPost,
+  isInstagramReel,
   getEmbedUrl,
   getSeriesPrefix,
-  generateBookSlug,
 } from './helpers/bookHelpers';
 
 // ============================================================
@@ -63,10 +64,8 @@ export const StatusBadge = ({
 // PROPS
 // ============================================================
 interface BookDetailModalProps {
-  // Untuk katalog: bisa punya banyak varian (hardcover, paperback, dll)
-  // Untuk MiniCatalog: cukup 1 buku
   book: Book;
-  variants?: Book[]; // opsional, untuk katalog
+  variants?: Book[];
   relatedBooks: Book[];
   onClose: () => void;
   onRelatedClick: (book: Book) => void;
@@ -103,8 +102,9 @@ export default function BookDetailModal({
 
   const handleShare = async () => {
     try {
-      const slug = generateBookSlug(activeVariant.id, activeVariant.title);
-      const url = `${window.location.origin}/buku/${slug}`;
+      const url = activeVariant.slug
+        ? `${window.location.origin}/katalog/${activeVariant.slug}`
+        : `${window.location.origin}/katalog`;
       await navigator.clipboard.writeText(url);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -143,6 +143,9 @@ export default function BookDetailModal({
     activeVariant.status === 'ARCHIVE';
 
   const hasVariants = variants && variants.length > 1;
+
+  // ✅ FUNGSI HELPER UNTUK MENENTUKAN JENIS VIDEO
+  const isYouTube = activeVariant.previewurl?.includes('youtube.com') || activeVariant.previewurl?.includes('youtu.be');
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm text-left">
@@ -203,11 +206,10 @@ export default function BookDetailModal({
                   <button
                     key={v.id}
                     onClick={() => setActiveVariant(v)}
-                    className={`px-4 py-2 rounded-lg text-sm font-bold border transition-all flex flex-col items-start ${
-                      activeVariant.id === v.id
+                    className={`px-4 py-2 rounded-lg text-sm font-bold border transition-all flex flex-col items-start ${activeVariant.id === v.id
                         ? 'bg-[#FFF9F0] border-[#8B5E3C] text-[#8B5E3C] ring-2 ring-orange-200'
                         : 'bg-white border-gray-200 text-gray-500 hover:border-orange-300'
-                    }`}
+                      }`}
                   >
                     <span>{v.type}</span>
                     <span className="text-xs font-normal">
@@ -255,8 +257,8 @@ export default function BookDetailModal({
                 {activeVariant.status === 'READY'
                   ? 'Tersedia'
                   : activeVariant.status === 'PO'
-                  ? 'Pre-Order'
-                  : 'Belum Masuk Batch PO'}
+                    ? 'Pre-Order'
+                    : 'Belum Masuk Batch PO'}
               </span>
             </div>
             <div className="flex justify-between">
@@ -297,63 +299,45 @@ export default function BookDetailModal({
             )}
           </div>
 
-          {/* Preview Embed */}
-          {activeVariant.previewurl && (
+          {/* ✅ PREVIEW EMBED - DIUBAH MENJADI TOMBOL UI CANTIK */}
+          {activeVariant.previewurl ? (
             <div className="mb-6">
               <h4 className="font-bold text-[#8B5E3C] mb-2 flex items-center gap-2">
                 <Eye className="w-4 h-4" /> Preview Buku
               </h4>
-              {isEmbeddable(activeVariant.previewurl) ? (
-                <>
-                  <div
-                    className={`relative w-full rounded-xl overflow-hidden shadow-sm border border-orange-100 ${
-                      activeVariant.previewurl.includes('instagram')
-                        ? 'h-[550px]'
-                        : 'aspect-video'
-                    }`}
-                  >
-                    <iframe
-                      className="absolute inset-0 w-full h-full"
-                      src={getEmbedUrl(activeVariant.previewurl) as string}
-                      title={`Preview buku ${activeVariant.title}`}
-                      loading="lazy"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
-                      sandbox="allow-scripts allow-same-origin allow-presentation"
-                      allowFullScreen
-                    />
-                  </div>
-                  <a
-                    href={activeVariant.previewurl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-orange-400 hover:text-orange-600 mt-1 inline-block underline"
-                  >
-                    Buka di aplikasi
-                  </a>
-                </>
-              ) : (
-                <a
-                  href={activeVariant.previewurl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-between p-4 bg-orange-50 hover:bg-orange-100 border border-orange-200 rounded-xl transition-all group"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="bg-white p-2 rounded-lg shadow-sm">
-                      <BookIcon className="w-6 h-6 text-[#8B5E3C]" />
-                    </div>
-                    <div>
-                      <p className="font-bold text-[#8B5E3C] text-sm">
-                        Lihat Isi Buku (Look Inside)
-                      </p>
-                      <p className="text-xs text-orange-400">
-                        Preview tersedia di website eksternal
-                      </p>
-                    </div>
-                  </div>
-                  <ArrowRight className="w-5 h-5 text-[#8B5E3C] group-hover:translate-x-1 transition-transform" />
-                </a>
-              )}
+              <a
+                href={activeVariant.previewurl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`flex items-center gap-3 p-4 border rounded-2xl transition-all group w-full ${isYouTube
+                    ? 'bg-gradient-to-r from-red-50 to-orange-50 hover:from-red-100 hover:to-orange-100 border-red-200'
+                    : 'bg-gradient-to-r from-purple-50 to-pink-50 hover:from-purple-100 hover:to-pink-100 border-purple-200'
+                  }`}
+              >
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0 ${isYouTube
+                    ? 'bg-gradient-to-br from-red-500 to-red-600'
+                    : 'bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400'
+                  }`}>
+                  {isYouTube ? (
+                    <Youtube className="w-5 h-5 text-white fill-white group-hover:scale-110 transition-transform" />
+                  ) : (
+                    <Play className="w-5 h-5 text-white fill-white group-hover:scale-110 transition-transform" />
+                  )}
+                </div>
+                <div className="flex-1 text-left">
+                  <p className="font-bold text-[#8B5E3C] text-sm line-clamp-1">Lihat Video Preview</p>
+                  <p className={`text-[10px] font-medium ${isYouTube ? 'text-red-500' : 'text-purple-500'}`}>
+                    {isYouTube ? 'Buka di YouTube' : 'Buka Reels Instagram'}
+                  </p>
+                </div>
+                <ExternalLink className={`w-5 h-5 group-hover:translate-x-1 transition-transform ${isYouTube ? 'text-red-400' : 'text-purple-400'}`} />
+              </a>
+            </div>
+          ) : (
+            <div className="mb-6">
+              <div className="p-4 bg-orange-50/50 rounded-2xl border border-orange-100/50 flex items-center justify-center gap-2 text-gray-400 text-sm">
+                <Eye className="w-4 h-4" /> Belum ada video preview
+              </div>
             </div>
           )}
 

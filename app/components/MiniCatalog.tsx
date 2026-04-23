@@ -5,7 +5,8 @@ import { supabase } from '@/supabaseClient';
 import {
   ShoppingBag, Star, Truck, Clock, Bookmark,
   MessageCircle, Eye, User, Building2, Book as BookIcon, Globe,
-  X, ArrowRight, Sparkles, Flame, Hourglass, Share2, Check
+  X, ArrowRight, Sparkles, Flame, Hourglass, Share2, Check,
+  Youtube, Play, ExternalLink // <-- INI 3 ICON TAMBAHANNYA
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 
@@ -13,7 +14,7 @@ import { useCart } from '../context/CartContext';
 // TIPE DATA
 // ============================================================
 import type { Book } from '@/app/types/book';
-import { generateBookSlug } from './helpers/bookHelpers';
+
 
 // ============================================================
 // KONSTANTA
@@ -47,12 +48,22 @@ const getWaLink = (book: Book): string => {
   return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
 };
 
+const isInstagramPost = (url: string): boolean => {
+  if (!url || !url.includes('instagram.com')) return false;
+  return url.includes('/p/');
+};
+
+const isInstagramReel = (url: string): boolean => {
+  if (!url || !url.includes('instagram.com')) return false;
+  return url.includes('/reel/') || url.includes('/reels/');
+};
+
 const isEmbeddable = (url: string): boolean => {
   if (!url) return false;
   return (
     url.includes('youtube.com') ||
     url.includes('youtu.be') ||
-    url.includes('instagram.com')
+    isInstagramPost(url)
   );
 };
 
@@ -66,13 +77,14 @@ const getEmbedUrl = (url: string): string | null => {
       videoId = url.split('v=')[1]?.split('&')[0] || '';
     } else if (url.includes('/embed/')) {
       return url;
+    } else if (url.includes('/shorts/')) {
+      videoId = url.split('/shorts/')[1]?.split('?')[0] || '';
     }
     return `https://www.youtube.com/embed/${videoId}`;
   }
-  if (url.includes('instagram.com')) {
+  if (isInstagramPost(url)) {
     let cleanUrl = url.split('?')[0];
     if (cleanUrl.endsWith('/')) cleanUrl = cleanUrl.slice(0, -1);
-    cleanUrl = cleanUrl.replace('/reel/', '/p/');
     return `${cleanUrl}/embed`;
   }
   return url;
@@ -254,8 +266,9 @@ const BookModal = ({
 
   const handleShare = async () => {
     try {
-      const slug = generateBookSlug(book.id, book.title);
-      const url = `${window.location.origin}/buku/${slug}`;
+      const url = book.slug
+        ? `${window.location.origin}/katalog/${book.slug}`
+        : `${window.location.origin}/katalog`;
       await navigator.clipboard.writeText(url);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -375,8 +388,8 @@ const BookModal = ({
                 {book.status === 'READY'
                   ? 'Tersedia'
                   : book.status === 'PO'
-                  ? 'Pre-Order'
-                  : 'Belum Masuk Batch PO'}
+                    ? 'Pre-Order'
+                    : 'Belum Masuk Batch PO'}
               </span>
             </div>
             <div className="flex justify-between">
@@ -409,28 +422,64 @@ const BookModal = ({
             </div>
           </div>
 
-          {/* Preview Embed */}
+          {/* Preview Embed — YouTube & Instagram Carousel */}
           {book.previewurl && isEmbeddable(book.previewurl) && (
             <div className="mb-6">
               <h4 className="font-bold text-[#8B5E3C] mb-2 flex items-center gap-2">
                 <Eye className="w-4 h-4" /> Preview Buku
               </h4>
-              <div
-                className={`relative w-full rounded-xl overflow-hidden shadow-sm border border-orange-100 ${
-                  book.previewurl.includes('instagram') ? 'h-[550px]' : 'aspect-video'
-                }`}
-              >
-                {/* ✅ FIX: iframe dengan sandbox + loading lazy */}
+              <div className={`relative w-full rounded-xl overflow-hidden shadow-sm border border-orange-100 ${isInstagramPost(book.previewurl) ? 'h-[550px]' : 'aspect-video'}`}>
                 <iframe
                   className="absolute inset-0 w-full h-full"
                   src={getEmbedUrl(book.previewurl) as string}
                   title={`Preview buku ${book.title}`}
                   loading="lazy"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
-                  sandbox="allow-scripts allow-same-origin allow-presentation"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
                 />
               </div>
+            </div>
+          )}
+
+          {/* ✅ PREVIEW EMBED - DIUBAH MENJADI TOMBOL UI CANTIK ANTI-LAG */}
+          {book.previewurl && (
+            <div className="mb-6">
+              <h4 className="font-bold text-[#8B5E3C] mb-2 flex items-center gap-2">
+                <Eye className="w-4 h-4" /> Preview Buku
+              </h4>
+              <a
+                href={book.previewurl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`flex items-center gap-3 p-4 border rounded-2xl transition-all group w-full ${book.previewurl.includes('youtube.com') || book.previewurl.includes('youtu.be')
+                    ? 'bg-gradient-to-r from-red-50 to-orange-50 hover:from-red-100 hover:to-orange-100 border-red-200'
+                    : 'bg-gradient-to-r from-purple-50 to-pink-50 hover:from-purple-100 hover:to-pink-100 border-purple-200'
+                  }`}
+              >
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0 ${book.previewurl.includes('youtube.com') || book.previewurl.includes('youtu.be')
+                    ? 'bg-gradient-to-br from-red-500 to-red-600'
+                    : 'bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400'
+                  }`}>
+                  {book.previewurl.includes('youtube.com') || book.previewurl.includes('youtu.be') ? (
+                    <Youtube className="w-5 h-5 text-white fill-white group-hover:scale-110 transition-transform" />
+                  ) : (
+                    <Play className="w-5 h-5 text-white fill-white group-hover:scale-110 transition-transform" />
+                  )}
+                </div>
+                <div className="flex-1 text-left">
+                  <p className="font-bold text-[#8B5E3C] text-sm line-clamp-1">Lihat Video Preview</p>
+                  <p className={`text-[10px] font-medium ${book.previewurl.includes('youtube.com') || book.previewurl.includes('youtu.be')
+                      ? 'text-red-500'
+                      : 'text-purple-500'
+                    }`}>
+                    {book.previewurl.includes('youtube.com') || book.previewurl.includes('youtu.be') ? 'Buka di YouTube' : 'Buka di Instagram'}
+                  </p>
+                </div>
+                <ExternalLink className={`w-5 h-5 group-hover:translate-x-1 transition-transform ${book.previewurl.includes('youtube.com') || book.previewurl.includes('youtu.be')
+                    ? 'text-red-400'
+                    : 'text-purple-400'
+                  }`} />
+              </a>
             </div>
           )}
 

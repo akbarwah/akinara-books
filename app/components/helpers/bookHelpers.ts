@@ -20,8 +20,21 @@ export const isEmbeddable = (url: string): boolean => {
   return (
     url.includes('youtube.com') ||
     url.includes('youtu.be') ||
-    url.includes('instagram.com')
+    // Instagram post/carousel bisa di-embed, Reels tidak (blocked by X-Frame-Options)
+    isInstagramPost(url)
   );
+};
+
+// Instagram post/carousel — bisa di-embed via iframe (/p/ URL)
+export const isInstagramPost = (url: string): boolean => {
+  if (!url || !url.includes('instagram.com')) return false;
+  return url.includes('/p/');
+};
+
+// Instagram Reels — TIDAK bisa di-embed (blocked by X-Frame-Options)
+export const isInstagramReel = (url: string): boolean => {
+  if (!url || !url.includes('instagram.com')) return false;
+  return url.includes('/reel/') || url.includes('/reels/');
 };
 
 export const getEmbedUrl = (url: string): string | null => {
@@ -34,13 +47,15 @@ export const getEmbedUrl = (url: string): string | null => {
       videoId = url.split('v=')[1]?.split('&')[0] || '';
     } else if (url.includes('/embed/')) {
       return url;
+    } else if (url.includes('/shorts/')) {
+      videoId = url.split('/shorts/')[1]?.split('?')[0] || '';
     }
     return `https://www.youtube.com/embed/${videoId}`;
   }
-  if (url.includes('instagram.com')) {
+  // Instagram post/carousel embed
+  if (isInstagramPost(url)) {
     let cleanUrl = url.split('?')[0];
     if (cleanUrl.endsWith('/')) cleanUrl = cleanUrl.slice(0, -1);
-    cleanUrl = cleanUrl.replace('/reel/', '/p/');
     return `${cleanUrl}/embed`;
   }
   return url;
