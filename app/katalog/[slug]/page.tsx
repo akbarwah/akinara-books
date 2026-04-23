@@ -4,6 +4,12 @@ import { notFound } from 'next/navigation';
 import BookDetailClient from './BookDetailClient';
 import type { Book } from '@/app/types/book';
 
+// ==================== CACHING ====================
+
+// ✅ ISR: cache halaman 60 detik, lalu revalidate di background
+// Ini JAUH lebih cepat dari force-dynamic (setiap request query DB)
+export const revalidate = 60;
+
 // ==================== TYPES ====================
 
 interface PageProps {
@@ -23,7 +29,7 @@ async function getBook(slug: string): Promise<Book | null> {
     return data as Book;
 }
 
-// ✅ BARU: Ambil semua varian (judul sama, tipe beda)
+// Ambil semua varian (judul sama, tipe beda)
 async function getBookVariants(book: Book): Promise<Book[]> {
     const { data } = await supabase
         .from('books')
@@ -31,31 +37,31 @@ async function getBookVariants(book: Book): Promise<Book[]> {
         .eq('title', book.title.trim())
         .order('price', { ascending: true });
 
-    if (!data || data.length <= 1) return []; // Tidak ada varian lain
+    if (!data || data.length <= 1) return [];
     return data as Book[];
 }
 
+// ✅ OPTIMIZED: Fetch lebih sedikit data untuk rekomendasi
 async function getRelatedBooks(currentBook: Book): Promise<Book[]> {
-    // ✅ Fetch lebih targeted — hanya buku yang kemungkinan relevan
+    const filters = [
+        currentBook.author ? `author.eq.${currentBook.author}` : '',
+        currentBook.publisher ? `publisher.eq.${currentBook.publisher}` : '',
+        currentBook.age ? `age.eq.${currentBook.age}` : '',
+    ].filter(Boolean).join(',');
+
+    // Jika tidak ada filter yang valid, return kosong
+    if (!filters) return [];
+
     const { data } = await supabase
         .from('books')
-        .select('*')
+        // ✅ Select hanya field yang dibutuhkan untuk card rekomendasi
+        .select('id,title,price,image,status,type,slug,author,publisher,age,category,sticker_text')
         .neq('id', currentBook.id)
-        .or(
-            [
-                currentBook.author ? `author.eq.${currentBook.author}` : '',
-                currentBook.category ? `category.eq.${currentBook.category}` : '',
-                currentBook.publisher ? `publisher.eq.${currentBook.publisher}` : '',
-                currentBook.age ? `age.eq.${currentBook.age}` : '',
-            ]
-                .filter(Boolean)
-                .join(',')
-        )
-        .limit(200);
+        .or(filters)
+        .limit(50); // ✅ Turunkan dari 200 ke 50
 
     if (!data || data.length === 0) return [];
 
-    // ✅ Ambil 2 & 3 kata pertama untuk deteksi seri (lebih akurat)
     const normalize = (title: string) =>
         title.toLowerCase().replace(/[^\w\s]/gi, '').trim();
 
@@ -63,7 +69,6 @@ async function getRelatedBooks(currentBook: Book): Promise<Book[]> {
     const currentSeries2 = currentWords.slice(0, 2).join(' ');
     const currentSeries3 = currentWords.slice(0, 3).join(' ');
 
-    // ✅ Scoring logic — lebih granular
     const scored = (data as Book[])
         .map((b) => {
             let score = 0;
@@ -71,73 +76,28 @@ async function getRelatedBooks(currentBook: Book): Promise<Book[]> {
             const bSeries2 = bWords.slice(0, 2).join(' ');
             const bSeries3 = bWords.slice(0, 3).join(' ');
 
-            // 🥇 Seri yang sama (3 kata) — paling kuat
-            if (
-                currentSeries3.length > 5 &&
-                bSeries3 === currentSeries3
-            ) {
-                score += 15;
-            }
-            // 🥈 Seri yang sama (2 kata) — kuat
-            else if (
-                currentSeries2.length > 3 &&
-                bSeries2 === currentSeries2
-            ) {
-                score += 10;
-            }
+            if (currentSeries3.length > 5 && bSeries3 === currentSeries3) score += 15;
+            else if (currentSeries2.length > 3 && bSeries2 === currentSeries2) score += 10;
 
-            // 🥉 Author sama
-            if (
-                b.author &&
-                currentBook.author &&
-                b.author.toLowerCase() === currentBook.author.toLowerCase()
-            ) {
-                score += 5;
-            }
-
-            // ✅ Publisher sama
-            if (
-                b.publisher &&
-                currentBook.publisher &&
-                b.publisher.toLowerCase() === currentBook.publisher.toLowerCase()
-            ) {
-                score += 3;
-            }
-
-            // ✅ Usia sama
-            if (
-                b.age &&
-                currentBook.age &&
-                b.age === currentBook.age
-            ) {
-                score += 3;
-            }
-
-            // ✅ Type/format sama
-            if (
-                b.type &&
-                currentBook.type &&
-                b.type.toLowerCase() === currentBook.type.toLowerCase()
-            ) {
-                score += 1;
-            }
-
-            // Kategori sama (Impor/Lokal)
-            if (b.category === currentBook.category) {
-                score += 1;
-            }
+            if (b.author && currentBook.author &&
+                b.author.toLowerCase() === currentBook.author.toLowerCase()) score += 5;
+            if (b.publisher && currentBook.publisher &&
+                b.publisher.toLowerCase() === currentBook.publisher.toLowerCase()) score += 3;
+            if (b.age && currentBook.age && b.age === currentBook.age) score += 3;
+            if (b.type && currentBook.type &&
+                b.type.toLowerCase() === currentBook.type.toLowerCase()) score += 1;
+            if (b.category === currentBook.category) score += 1;
 
             return { ...b, _score: score };
         })
         .filter((b) => b._score > 0)
         .sort((a, b) => {
-            // ✅ Sort by score, lalu by status (READY first)
             if (b._score !== a._score) return b._score - a._score;
             const statusOrder: Record<string, number> = { READY: 0, PO: 1, BACKLIST: 2 };
             return (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9);
         });
 
-    // ✅ Deduplicate by title (ambil yang skor tertinggi / READY)
+    // Deduplicate by title
     const unique: Book[] = [];
     const seen = new Set<string>();
     for (const b of scored) {
@@ -156,7 +116,12 @@ async function getRelatedBooks(currentBook: Book): Promise<Book[]> {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
     const { slug } = await params;
-    const book = await getBook(slug);
+    // ✅ Select hanya field yang dibutuhkan untuk metadata (bukan select *)
+    const { data: book } = await supabase
+        .from('books')
+        .select('title,description,desc,type,age,status,price,image')
+        .eq('slug', slug)
+        .single();
 
     if (!book) {
         return { title: 'Buku Tidak Ditemukan — Akinara Books' };
@@ -191,9 +156,6 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
         },
     };
 }
-
-// ✅ Render on-demand, bukan saat build (hindari timeout di Vercel)
-export const dynamic = 'force-dynamic';
 
 // ==================== PAGE ====================
 

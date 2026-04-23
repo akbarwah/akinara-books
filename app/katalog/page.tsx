@@ -3,7 +3,10 @@ import { supabase } from '../../supabaseClient';
 import KatalogClient from './KatalogClient';
 import type { Book } from '@/app/types/book';
 import { STATUS_PRIORITY } from '../components/helpers/bookHelpers';
-export const dynamic = 'force-dynamic';
+
+// ✅ ISR: cache halaman 60 detik, lalu revalidate di background
+// Sebelumnya force-dynamic = setiap request query DB = lambat 3-6 detik
+export const revalidate = 60;
 
 // ✅ Helper: konversi status ke schema availability
 function getAvailability(status: string): string {
@@ -32,8 +35,11 @@ function groupBooks(books: Book[]): { title: string; books: Book[] }[] {
 }
 
 export default async function KatalogPage() {
-  // ✅ Fetch di server — select('*') sudah include slug
-  const { data, error } = await supabase.from('books').select('*');
+  // ✅ Select hanya kolom yang dipakai oleh grid card + filter bar
+  // Tidak perlu description/desc/pages/previewurl/eta di list view
+  const { data, error } = await supabase
+    .from('books')
+    .select('id,title,price,image,status,type,weight,author,publisher,category,age,sticker_text,is_highlight,slug');
 
   const books: Book[] = error || !data
     ? []
