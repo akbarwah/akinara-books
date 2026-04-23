@@ -38,6 +38,10 @@ export default async function KatalogPage() {
   // ✅ Fetch di server — ISR (revalidate=60) memastikan ini di-cache, bukan query setiap request
   const { data, error } = await supabase.from('books').select('*');
 
+  if (error) {
+    console.error('Error fetching books in KatalogPage:', error);
+  }
+
   const books: Book[] = error || !data
     ? []
     : [...data].sort((a, b) => {

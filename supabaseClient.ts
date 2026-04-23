@@ -7,13 +7,5 @@ if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error('Missing environment variable: NEXT_PUBLIC_SUPABASE_URL atau ANON_KEY');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    global: {
-        // ✅ Disable Next.js internal fetch caching untuk Supabase requests
-        // Tanpa ini, Next.js meng-cache response fetch() secara agresif di server components
-        // Page-level caching tetap ditangani oleh ISR (revalidate) atau force-dynamic
-        fetch: (url, options = {}) => {
-            return fetch(url, { ...options, cache: 'no-store' })
-        },
-    },
-})
+// ✅ Use default fetch behavior so Next.js can use its own caching strategy (ISR via revalidate)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
