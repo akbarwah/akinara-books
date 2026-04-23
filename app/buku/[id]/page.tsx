@@ -477,7 +477,7 @@ export default function BookDetailPage({
               ) : (
                 <div className="bg-orange-50/50 rounded-3xl border border-orange-100/50 p-12 text-center flex flex-col items-center justify-center text-gray-400 h-[300px]">
                   <Eye className="w-12 h-12 mb-4 text-orange-200" />
-                  <p className="font-medium">Video preview belum tersedia untuk buku ini</p>
+                  <p className="font-medium">Preview belum tersedia</p>
                 </div>
               )}
             </div>

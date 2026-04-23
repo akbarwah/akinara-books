@@ -54,11 +54,10 @@ async function getRelatedBooks(currentBook: Book): Promise<Book[]> {
 
     const { data } = await supabase
         .from('books')
-        // ✅ Select hanya field yang dibutuhkan untuk card rekomendasi
-        .select('id,title,price,image,status,type,slug,author,publisher,age,category,sticker_text')
+        .select('*')
         .neq('id', currentBook.id)
         .or(filters)
-        .limit(50); // ✅ Turunkan dari 200 ke 50
+        .limit(50);
 
     if (!data || data.length === 0) return [];
 
@@ -116,12 +115,7 @@ async function getRelatedBooks(currentBook: Book): Promise<Book[]> {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
     const { slug } = await params;
-    // ✅ Select hanya field yang dibutuhkan untuk metadata (bukan select *)
-    const { data: book } = await supabase
-        .from('books')
-        .select('title,description,desc,type,age,status,price,image')
-        .eq('slug', slug)
-        .single();
+    const book = await getBook(slug);
 
     if (!book) {
         return { title: 'Buku Tidak Ditemukan — Akinara Books' };

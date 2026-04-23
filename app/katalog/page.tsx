@@ -35,11 +35,8 @@ function groupBooks(books: Book[]): { title: string; books: Book[] }[] {
 }
 
 export default async function KatalogPage() {
-  // ✅ Select hanya kolom yang dipakai oleh grid card + filter bar
-  // Tidak perlu description/desc/pages/previewurl/eta di list view
-  const { data, error } = await supabase
-    .from('books')
-    .select('id,title,price,image,status,type,weight,author,publisher,category,age,sticker_text,is_highlight,slug');
+  // ✅ Fetch di server — ISR (revalidate=60) memastikan ini di-cache, bukan query setiap request
+  const { data, error } = await supabase.from('books').select('*');
 
   const books: Book[] = error || !data
     ? []

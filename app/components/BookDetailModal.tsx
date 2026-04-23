@@ -207,8 +207,8 @@ export default function BookDetailModal({
                     key={v.id}
                     onClick={() => setActiveVariant(v)}
                     className={`px-4 py-2 rounded-lg text-sm font-bold border transition-all flex flex-col items-start ${activeVariant.id === v.id
-                        ? 'bg-[#FFF9F0] border-[#8B5E3C] text-[#8B5E3C] ring-2 ring-orange-200'
-                        : 'bg-white border-gray-200 text-gray-500 hover:border-orange-300'
+                      ? 'bg-[#FFF9F0] border-[#8B5E3C] text-[#8B5E3C] ring-2 ring-orange-200'
+                      : 'bg-white border-gray-200 text-gray-500 hover:border-orange-300'
                       }`}
                   >
                     <span>{v.type}</span>
@@ -310,13 +310,13 @@ export default function BookDetailModal({
                 target="_blank"
                 rel="noopener noreferrer"
                 className={`flex items-center gap-3 p-4 border rounded-2xl transition-all group w-full ${isYouTube
-                    ? 'bg-gradient-to-r from-red-50 to-orange-50 hover:from-red-100 hover:to-orange-100 border-red-200'
-                    : 'bg-gradient-to-r from-purple-50 to-pink-50 hover:from-purple-100 hover:to-pink-100 border-purple-200'
+                  ? 'bg-gradient-to-r from-red-50 to-orange-50 hover:from-red-100 hover:to-orange-100 border-red-200'
+                  : 'bg-gradient-to-r from-purple-50 to-pink-50 hover:from-purple-100 hover:to-pink-100 border-purple-200'
                   }`}
               >
                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0 ${isYouTube
-                    ? 'bg-gradient-to-br from-red-500 to-red-600'
-                    : 'bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400'
+                  ? 'bg-gradient-to-br from-red-500 to-red-600'
+                  : 'bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400'
                   }`}>
                   {isYouTube ? (
                     <Youtube className="w-5 h-5 text-white fill-white group-hover:scale-110 transition-transform" />
