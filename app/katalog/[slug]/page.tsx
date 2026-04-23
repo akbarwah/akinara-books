@@ -192,12 +192,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     };
 }
 
-// ==================== STATIC PARAMS ====================
-
-export async function generateStaticParams() {
-    const { data } = await supabase.from('books').select('slug');
-    return (data || []).map((book) => ({ slug: book.slug }));
-}
+// ✅ Render on-demand, bukan saat build (hindari timeout di Vercel)
+export const dynamic = 'force-dynamic';
 
 // ==================== PAGE ====================
 
