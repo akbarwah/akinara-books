@@ -3,6 +3,7 @@ import { supabase } from '../../supabaseClient';
 import KatalogClient from './KatalogClient';
 import type { Book } from '@/app/types/book';
 import { STATUS_PRIORITY } from '../components/helpers/bookHelpers';
+export const dynamic = 'force-dynamic';
 
 // ✅ Helper: konversi status ke schema availability
 function getAvailability(status: string): string {
