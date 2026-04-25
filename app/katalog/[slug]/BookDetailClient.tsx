@@ -17,6 +17,12 @@ import StickerBadge from '@/app/components/StickerBadge';
 import {
     PLACEHOLDER_IMAGE,
     getSeriesPrefix,
+    getWaLink,
+    isInstagramPost,
+    isInstagramReel,
+    isEmbeddable,
+    isGoogleBooksPreview,
+    getEmbedUrl,
 } from '@/app/components/helpers/bookHelpers';
 
 // ==================== HELPERS ====================
@@ -28,53 +34,7 @@ const formatRupiah = (num: number) =>
         minimumFractionDigits: 0,
     }).format(num);
 
-const getWaLink = (book: Book): string => {
-    const phone = '6282314336969';
-    const text = `Halo Admin Akinara, saya tertarik dengan buku *${book.title}* (${book.type}). Apakah varian ini akan ada di Batch PO berikutnya?`;
-    return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
-};
 
-const isInstagramPost = (url: string): boolean => {
-    if (!url || !url.includes('instagram.com')) return false;
-    return url.includes('/p/');
-};
-
-const isInstagramReel = (url: string): boolean => {
-    if (!url || !url.includes('instagram.com')) return false;
-    return url.includes('/reel/') || url.includes('/reels/');
-};
-
-const isEmbeddable = (url: string): boolean => {
-    if (!url) return false;
-    return (
-        url.includes('youtube.com') ||
-        url.includes('youtu.be') ||
-        isInstagramPost(url)
-    );
-};
-
-const getEmbedUrl = (url: string): string | null => {
-    if (!url) return null;
-    if (url.includes('youtube.com') || url.includes('youtu.be')) {
-        let videoId = '';
-        if (url.includes('youtu.be')) {
-            videoId = url.split('/').pop()?.split('?')[0] || '';
-        } else if (url.includes('watch?v=')) {
-            videoId = url.split('v=')[1]?.split('&')[0] || '';
-        } else if (url.includes('/embed/')) {
-            return url;
-        } else if (url.includes('/shorts/')) {
-            videoId = url.split('/shorts/')[1]?.split('?')[0] || '';
-        }
-        return `https://www.youtube.com/embed/${videoId}`;
-    }
-    if (isInstagramPost(url)) {
-        let cleanUrl = url.split('?')[0];
-        if (cleanUrl.endsWith('/')) cleanUrl = cleanUrl.slice(0, -1);
-        return `${cleanUrl}/embed`;
-    }
-    return url;
-};
 
 const StatusBadge = ({ status, size = 'md' }: { status: string; size?: 'sm' | 'md' }) => {
     const baseClass = size === 'sm'
@@ -439,6 +399,21 @@ export default function BookDetailClient({
                                                 }
                                             }}
                                         />
+                                    </div>
+                                ) : isGoogleBooksPreview(activeVariant.previewurl) ? (
+                                    /* RENDER KHUSUS GOOGLE BOOKS PREVIEW */
+                                    <div className="relative w-full rounded-3xl overflow-hidden shadow-lg border border-orange-100 bg-white h-[500px]">
+                                        <iframe
+                                            className="absolute inset-0 w-full h-full"
+                                            src={getEmbedUrl(activeVariant.previewurl) as string}
+                                            title={`Preview buku ${activeVariant.title}`}
+                                            loading="lazy"
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                            allowFullScreen
+                                        />
+                                        <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full text-[10px] font-bold text-gray-500 shadow-sm border border-gray-100 flex items-center gap-1.5">
+                                            <BookIcon className="w-3 h-3" /> Powered by Google Books
+                                        </div>
                                     </div>
                                 ) : isEmbeddable(activeVariant.previewurl) ? (
                                     /* RENDER KHUSUS YOUTUBE/LAINNYA (TETAP PAKAI IFRAME) */
