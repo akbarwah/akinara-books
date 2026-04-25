@@ -72,19 +72,16 @@ const FORMAT_OPTIONS = [
   'Lift-the-Flap', 'Picture Book', 'Interactive', 'Sound Book'
 ];
 const AGE_OPTIONS = [
-  '0-2 Thn', '1-3 Thn', '2-4 Thn', '2-5 Thn',
-  '3-5 Thn', '3-6 Thn', '3-8 Thn',
-  '4-7 Thn', '4-8 Thn', '5-7 Thn',
-  '5-8 Thn', '5-9 Thn', '6-8 Thn',
-  '6-9 Thn', '7-9 Thn', '8-12 Thn',
-  '9-12 Thn', '12+ Thn', 'All Ages',
+  '0-1 tahun', '1-2 tahun', '2-4 tahun', '4-6 tahun',
+  '6-8 tahun', '8-10 tahun', '10-12 tahun', '12+ tahun',
+  'All Ages',
 ];
 const INACTIVITY_LIMIT = 10 * 60 * 1000;
 const MAX_HIGHLIGHTS = 4;
 const REQUIRED_CSV_COLUMNS = ['title', 'price', 'status'];
 
 const INITIAL_FORM: Book = {
-  title: '', price: '', type: 'Board Book', age: '0-2 Thn',
+  title: '', price: '', type: 'Board Book', age: '0-1 tahun',
   status: 'READY', category: 'Impor', publisher: '', author: '',
   pages: '', description: '', image: '', eta: 'Siap Kirim',
   previewurl: '', is_highlight: false, sticker_text: '',
