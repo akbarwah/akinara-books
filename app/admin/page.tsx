@@ -516,20 +516,31 @@ export default function AdminPage() {
           return;
         }
 
-        const dbMap = new Map<string, number>();
+        const exactSlugMap = new Map<string, number>();
+        const exactKeyMap = new Map<string, number>();
+        const fallbackSlugMap = new Map<string, number>();
+        const titleOnlyMap = new Map<string, number>();
+
         existingBooks?.forEach((b) => {
           if (b.slug) {
-            dbMap.set(b.slug, b.id);
+            exactSlugMap.set(b.slug, b.id);
           }
           if (b.title) {
             // Pemetaan cadangan berdasarkan title dan type
             const fallbackKey = `${b.title.trim().toLowerCase()}|${(b.type || 'Board Book').trim().toLowerCase()}`;
-            dbMap.set(fallbackKey, b.id);
+            exactKeyMap.set(fallbackKey, b.id);
+            
             // Pemetaan slug alternatif jika tipe buku tidak dilampirkan dalam database sebelumnya
             const fallbackSlug = generateSlug(b.title, b.type || 'Board Book');
-            dbMap.set(fallbackSlug, b.id);
+            // Jangan overwrite jika sudah ada (first come first serve)
+            if (!fallbackSlugMap.has(fallbackSlug)) {
+              fallbackSlugMap.set(fallbackSlug, b.id);
+            }
+            
             const titleOnlySlug = generateSlug(b.title);
-            dbMap.set(titleOnlySlug, b.id);
+            if (!titleOnlyMap.has(titleOnlySlug)) {
+              titleOnlyMap.set(titleOnlySlug, b.id);
+            }
           }
         });
 
@@ -540,7 +551,11 @@ export default function AdminPage() {
           const generatedSlug = generateSlug(cleanTitle, cleanType);
           const fallbackKey = `${cleanTitle.toLowerCase()}|${cleanType.toLowerCase()}`;
           
-          const existingId = dbMap.get(generatedSlug) || dbMap.get(fallbackKey) || dbMap.get(generateSlug(cleanTitle));
+          const existingId = 
+            exactSlugMap.get(generatedSlug) || 
+            exactKeyMap.get(fallbackKey) || 
+            fallbackSlugMap.get(generatedSlug) || 
+            titleOnlyMap.get(generateSlug(cleanTitle));
 
           return {
             id: existingId,
@@ -575,15 +590,23 @@ export default function AdminPage() {
         const finalPayload = Array.from(uniqueMap.values());
         const toInsert: Record<string, unknown>[] = [];
         const toUpdate: Record<string, unknown>[] = [];
+        const updatingIds = new Set<number>();
         let skippedCount = 0;
 
         finalPayload.forEach((item) => {
           if (item.id) {
-            // Hanya update jika overwrite diaktifkan
-            if (importOverwrite) {
-              toUpdate.push(item);
+            if (updatingIds.has(item.id)) {
+              // Jika ID ini sudah dipakai oleh varian lain di CSV, jadikan buku baru
+              const { id, ...withoutId } = item;
+              toInsert.push(withoutId);
             } else {
-              skippedCount++;
+              updatingIds.add(item.id);
+              // Hanya update jika overwrite diaktifkan
+              if (importOverwrite) {
+                toUpdate.push(item);
+              } else {
+                skippedCount++;
+              }
             }
           } else {
             const { id, ...withoutId } = item;
