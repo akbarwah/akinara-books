@@ -6,6 +6,7 @@ import React, {
 } from 'react';
 import { supabase } from '../../supabaseClient';
 import { generateSlug } from '../utils/slug';
+import { getEmbeddingAction } from './actions';
 import Papa from 'papaparse';
 import {
   ArrowLeft, Save, Plus, Edit, Trash2,
@@ -48,6 +49,7 @@ type Book = {
   previewurl: string;
   is_highlight?: boolean;
   sticker_text?: string;
+  original_price?: string;
 };
 
 interface OrderSummary {
@@ -69,6 +71,14 @@ const FORMAT_OPTIONS = [
   'Board Book', 'Hardback', 'Paperback',
   'Lift-the-Flap', 'Picture Book', 'Interactive', 'Sound Book'
 ];
+const AGE_OPTIONS = [
+  '0-2 Thn', '1-3 Thn', '2-4 Thn', '2-5 Thn',
+  '3-5 Thn', '3-6 Thn', '3-8 Thn',
+  '4-7 Thn', '4-8 Thn', '5-7 Thn',
+  '5-8 Thn', '5-9 Thn', '6-8 Thn',
+  '6-9 Thn', '7-9 Thn', '8-12 Thn',
+  '9-12 Thn', '12+ Thn', 'All Ages',
+];
 const INACTIVITY_LIMIT = 10 * 60 * 1000;
 const MAX_HIGHLIGHTS = 4;
 const REQUIRED_CSV_COLUMNS = ['title', 'price', 'status'];
@@ -78,6 +88,7 @@ const INITIAL_FORM: Book = {
   status: 'READY', category: 'Impor', publisher: '', author: '',
   pages: '', description: '', image: '', eta: 'Siap Kirim',
   previewurl: '', is_highlight: false, sticker_text: '',
+  original_price: '',
 };
 
 const EMPTY_ORDER_SUMMARY: OrderSummary = {
@@ -816,7 +827,16 @@ export default function AdminPage() {
 
     try {
       const bookTitle = formData.title || 'Tanpa Judul';
-      const payload = {
+      
+      // ✅ [OPTIMASI] Generate Embedding otomatis sebelum disimpan
+      const embedding = await getEmbeddingAction({
+        title: bookTitle,
+        category: formData.category || 'Impor',
+        age: formData.age || '',
+        desc: formData.description || '',
+      });
+
+      const payload: any = {
         title: bookTitle,
         slug: generateSlug(bookTitle, formData.type || 'Board Book'),
         price: formData.price ? parseInt(formData.price.toString()) : 0,
@@ -833,7 +853,12 @@ export default function AdminPage() {
         desc: formData.description || '',
         is_highlight: formData.is_highlight || false,
         sticker_text: formData.sticker_text || '',
+        original_price: formData.original_price || '',
       };
+
+      if (embedding) {
+        payload.embedding = embedding;
+      }
 
       let error;
       if (isEditing && formData.id) {
@@ -1084,7 +1109,8 @@ export default function AdminPage() {
               <tr className="bg-orange-50/30 border-b border-orange-100">
                 <th className="px-6 py-5 text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest text-center">ID</th>
                 <th className="px-6 py-5 text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest">Detail Katalog</th>
-                <th className="px-6 py-5 text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest text-center">Harga</th>
+                <th className="px-6 py-5 text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest text-center">Harga Jual</th>
+                <th className="px-6 py-5 text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest text-center">Harga Asli</th>
                 <th className="px-6 py-5 text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest text-center">Status</th>
                 <th className="px-6 py-5 text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest text-center">Aksi</th>
               </tr>
@@ -1092,14 +1118,14 @@ export default function AdminPage() {
             <tbody className="divide-y divide-orange-50">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="text-center py-20">
+                  <td colSpan={6} className="text-center py-20">
                     <Loader2 className="w-8 h-8 animate-spin text-orange-200 mx-auto mb-2" />
                     <p className="text-orange-200 font-bold uppercase text-xs">Loading...</p>
                   </td>
                 </tr>
               ) : filteredBooks.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="text-center py-20 text-gray-400 font-bold">
+                  <td colSpan={6} className="text-center py-20 text-gray-400 font-bold">
                     Data tidak ditemukan
                   </td>
                 </tr>
@@ -1162,6 +1188,10 @@ export default function AdminPage() {
 
                     <td className="px-6 py-4 text-base font-black text-[#FF9E9E] text-center italic">
                       Rp {Number(book.price).toLocaleString('id-ID')}
+                    </td>
+
+                    <td className="px-6 py-4 text-xs font-black text-slate-500 text-center">
+                      {book.original_price || '-'}
                     </td>
 
                     <td className="px-6 py-4 text-center">
@@ -1403,6 +1433,19 @@ export default function AdminPage() {
 
                 <div>
                   <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2">
+                    <Globe className="w-3 h-3" /> Harga Asli (Publisher)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.original_price || ''}
+                    onChange={(e) => setFormData({ ...formData, original_price: e.target.value })}
+                    placeholder="Contoh: USD 14.99"
+                    className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#FF9E9E] outline-none text-gray-900 font-bold text-lg"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2">
                     <BookOpenIcon className="w-3 h-3" /> Format / Material
                   </label>
                   <select
@@ -1473,13 +1516,15 @@ export default function AdminPage() {
                   <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2">
                     <Baby className="w-3 h-3" /> Rekomendasi Usia
                   </label>
-                  <input
-                    type="text"
-                    value={formData.age || ''}
+                  <select
+                    value={formData.age || '0-2 Thn'}
                     onChange={(e) => setFormData({ ...formData, age: e.target.value })}
-                    placeholder="Misal: 3-5 Tahun"
-                    className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#FF9E9E] outline-none text-gray-900 font-bold"
-                  />
+                    className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 font-bold text-gray-900 outline-none"
+                  >
+                    {AGE_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
