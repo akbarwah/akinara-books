@@ -20,75 +20,17 @@ import type { Book } from '@/app/types/book';
 // KONSTANTA
 // ============================================================
 
-// ✅ FIX: Placeholder SVG inline — tidak perlu file di /public
-const PLACEHOLDER_IMAGE =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='400' viewBox='0 0 300 400'%3E%3Crect width='300' height='400' fill='%23f3e8d0'/%3E%3Crect x='100' y='140' width='100' height='120' rx='8' fill='%23d4a574' opacity='0.5'/%3E%3Ctext x='150' y='300' text-anchor='middle' font-family='Arial' font-size='14' fill='%238B5E3C' opacity='0.7'%3EGambar tidak tersedia%3C/text%3E%3C/svg%3E";
-
-const STATUS_PRIORITY: { [key: string]: number } = {
-  READY: 1,
-  PO: 2,
-  BACKLIST: 3,
-};
-
-// ============================================================
-// HELPER FUNCTIONS
-// ============================================================
-const getSeriesPrefix = (title: string): string => {
-  return title
-    .toLowerCase()
-    .replace(/[^\w\s]/gi, '')
-    .split(' ')
-    .slice(0, 2)
-    .join(' ');
-};
-
-const getWaLink = (book: Book): string => {
-  const phone = '6282314336969';
-  const text = `Halo Admin Akinara, saya tertarik dengan buku *${book.title}* (${book.type}). Apakah varian ini akan ada di Batch PO berikutnya?`;
-  return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
-};
-
-const isInstagramPost = (url: string): boolean => {
-  if (!url || !url.includes('instagram.com')) return false;
-  return url.includes('/p/');
-};
-
-const isInstagramReel = (url: string): boolean => {
-  if (!url || !url.includes('instagram.com')) return false;
-  return url.includes('/reel/') || url.includes('/reels/');
-};
-
-const isEmbeddable = (url: string): boolean => {
-  if (!url) return false;
-  return (
-    url.includes('youtube.com') ||
-    url.includes('youtu.be') ||
-    isInstagramPost(url)
-  );
-};
-
-const getEmbedUrl = (url: string): string | null => {
-  if (!url) return null;
-  if (url.includes('youtube.com') || url.includes('youtu.be')) {
-    let videoId = '';
-    if (url.includes('youtu.be')) {
-      videoId = url.split('/').pop()?.split('?')[0] || '';
-    } else if (url.includes('watch?v=')) {
-      videoId = url.split('v=')[1]?.split('&')[0] || '';
-    } else if (url.includes('/embed/')) {
-      return url;
-    } else if (url.includes('/shorts/')) {
-      videoId = url.split('/shorts/')[1]?.split('?')[0] || '';
-    }
-    return `https://www.youtube.com/embed/${videoId}`;
-  }
-  if (isInstagramPost(url)) {
-    let cleanUrl = url.split('?')[0];
-    if (cleanUrl.endsWith('/')) cleanUrl = cleanUrl.slice(0, -1);
-    return `${cleanUrl}/embed`;
-  }
-  return url;
-};
+import {
+  PLACEHOLDER_IMAGE,
+  STATUS_PRIORITY,
+  getSeriesPrefix,
+  getWaLink,
+  isInstagramPost,
+  isInstagramReel,
+  isEmbeddable,
+  isGoogleBooksPreview,
+  getEmbedUrl,
+} from './helpers/bookHelpers';
 
 // ============================================================
 // STICKER BADGE COMPONENT
@@ -422,13 +364,19 @@ const BookModal = ({
             </div>
           </div>
 
-          {/* Preview Embed — YouTube & Instagram Carousel */}
+          {/* Preview Embed — YouTube, Instagram Carousel & Google Books */}
           {book.previewurl && isEmbeddable(book.previewurl) && (
             <div className="mb-6">
               <h4 className="font-bold text-[#8B5E3C] mb-2 flex items-center gap-2">
                 <Eye className="w-4 h-4" /> Preview Buku
               </h4>
-              <div className={`relative w-full rounded-xl overflow-hidden shadow-sm border border-orange-100 ${isInstagramPost(book.previewurl) ? 'h-[550px]' : 'aspect-video'}`}>
+              <div className={`relative w-full rounded-xl overflow-hidden shadow-sm border border-orange-100 ${
+                isGoogleBooksPreview(book.previewurl)
+                  ? 'h-[400px]'
+                  : isInstagramPost(book.previewurl)
+                    ? 'h-[550px]'
+                    : 'aspect-video'
+              }`}>
                 <iframe
                   className="absolute inset-0 w-full h-full"
                   src={getEmbedUrl(book.previewurl) as string}
@@ -437,48 +385,75 @@ const BookModal = ({
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
                 />
+                {isGoogleBooksPreview(book.previewurl) && (
+                  <div className="absolute bottom-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full text-[9px] font-bold text-gray-500 shadow-sm border border-gray-100 flex items-center gap-1">
+                    <BookIcon className="w-2.5 h-2.5" /> Google Books
+                  </div>
+                )}
               </div>
             </div>
           )}
 
-          {/* ✅ PREVIEW EMBED - DIUBAH MENJADI TOMBOL UI CANTIK ANTI-LAG */}
+          {/* Tombol external link untuk semua sumber preview */}
           {book.previewurl && (
             <div className="mb-6">
-              <h4 className="font-bold text-[#8B5E3C] mb-2 flex items-center gap-2">
-                <Eye className="w-4 h-4" /> Preview Buku
-              </h4>
+              {!isEmbeddable(book.previewurl) && (
+                <h4 className="font-bold text-[#8B5E3C] mb-2 flex items-center gap-2">
+                  <Eye className="w-4 h-4" /> Preview Buku
+                </h4>
+              )}
               <a
                 href={book.previewurl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`flex items-center gap-3 p-4 border rounded-2xl transition-all group w-full ${book.previewurl.includes('youtube.com') || book.previewurl.includes('youtu.be')
-                    ? 'bg-gradient-to-r from-red-50 to-orange-50 hover:from-red-100 hover:to-orange-100 border-red-200'
-                    : 'bg-gradient-to-r from-purple-50 to-pink-50 hover:from-purple-100 hover:to-pink-100 border-purple-200'
-                  }`}
+                className={`flex items-center gap-3 p-4 border rounded-2xl transition-all group w-full ${
+                  isGoogleBooksPreview(book.previewurl)
+                    ? 'bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 border-blue-200'
+                    : book.previewurl.includes('youtube.com') || book.previewurl.includes('youtu.be')
+                      ? 'bg-gradient-to-r from-red-50 to-orange-50 hover:from-red-100 hover:to-orange-100 border-red-200'
+                      : 'bg-gradient-to-r from-purple-50 to-pink-50 hover:from-purple-100 hover:to-pink-100 border-purple-200'
+                }`}
               >
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0 ${book.previewurl.includes('youtube.com') || book.previewurl.includes('youtu.be')
-                    ? 'bg-gradient-to-br from-red-500 to-red-600'
-                    : 'bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400'
-                  }`}>
-                  {book.previewurl.includes('youtube.com') || book.previewurl.includes('youtu.be') ? (
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0 ${
+                  isGoogleBooksPreview(book.previewurl)
+                    ? 'bg-gradient-to-br from-blue-500 to-indigo-600'
+                    : book.previewurl.includes('youtube.com') || book.previewurl.includes('youtu.be')
+                      ? 'bg-gradient-to-br from-red-500 to-red-600'
+                      : 'bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400'
+                }`}>
+                  {isGoogleBooksPreview(book.previewurl) ? (
+                    <BookIcon className="w-5 h-5 text-white group-hover:scale-110 transition-transform" />
+                  ) : book.previewurl.includes('youtube.com') || book.previewurl.includes('youtu.be') ? (
                     <Youtube className="w-5 h-5 text-white fill-white group-hover:scale-110 transition-transform" />
                   ) : (
                     <Play className="w-5 h-5 text-white fill-white group-hover:scale-110 transition-transform" />
                   )}
                 </div>
                 <div className="flex-1 text-left">
-                  <p className="font-bold text-[#8B5E3C] text-sm line-clamp-1">Lihat Video Preview</p>
-                  <p className={`text-[10px] font-medium ${book.previewurl.includes('youtube.com') || book.previewurl.includes('youtu.be')
-                      ? 'text-red-500'
-                      : 'text-purple-500'
-                    }`}>
-                    {book.previewurl.includes('youtube.com') || book.previewurl.includes('youtu.be') ? 'Buka di YouTube' : 'Buka di Instagram'}
+                  <p className="font-bold text-[#8B5E3C] text-sm line-clamp-1">
+                    {isGoogleBooksPreview(book.previewurl) ? 'Baca Preview Buku' : 'Lihat Video Preview'}
+                  </p>
+                  <p className={`text-[10px] font-medium ${
+                    isGoogleBooksPreview(book.previewurl)
+                      ? 'text-blue-500'
+                      : book.previewurl.includes('youtube.com') || book.previewurl.includes('youtu.be')
+                        ? 'text-red-500'
+                        : 'text-purple-500'
+                  }`}>
+                    {isGoogleBooksPreview(book.previewurl)
+                      ? 'Buka di Google Books'
+                      : book.previewurl.includes('youtube.com') || book.previewurl.includes('youtu.be')
+                        ? 'Buka di YouTube'
+                        : 'Buka di Instagram'}
                   </p>
                 </div>
-                <ExternalLink className={`w-5 h-5 group-hover:translate-x-1 transition-transform ${book.previewurl.includes('youtube.com') || book.previewurl.includes('youtu.be')
-                    ? 'text-red-400'
-                    : 'text-purple-400'
-                  }`} />
+                <ExternalLink className={`w-5 h-5 group-hover:translate-x-1 transition-transform ${
+                  isGoogleBooksPreview(book.previewurl)
+                    ? 'text-blue-400'
+                    : book.previewurl.includes('youtube.com') || book.previewurl.includes('youtu.be')
+                      ? 'text-red-400'
+                      : 'text-purple-400'
+                }`} />
               </a>
             </div>
           )}

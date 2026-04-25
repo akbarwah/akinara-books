@@ -39,36 +39,12 @@ const getWaLink = (book: Book): string => {
   return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
 };
 
-const isEmbeddable = (url: string): boolean => {
-  if (!url) return false;
-  return (
-    url.includes('youtube.com') ||
-    url.includes('youtu.be') ||
-    url.includes('instagram.com')
-  );
-};
-
-const getEmbedUrl = (url: string): string | null => {
-  if (!url) return null;
-  if (url.includes('youtube.com') || url.includes('youtu.be')) {
-    let videoId = '';
-    if (url.includes('youtu.be')) {
-      videoId = url.split('/').pop()?.split('?')[0] || '';
-    } else if (url.includes('watch?v=')) {
-      videoId = url.split('v=')[1]?.split('&')[0] || '';
-    } else if (url.includes('/embed/')) {
-      return url;
-    }
-    return `https://www.youtube.com/embed/${videoId}`;
-  }
-  if (url.includes('instagram.com')) {
-    // PERBAIKAN INSTAGRAM: Cukup buang parameter ?utm_source dll, lalu tambah /embed/
-    let cleanUrl = url.split('?')[0];
-    if (cleanUrl.endsWith('/')) cleanUrl = cleanUrl.slice(0, -1);
-    return `${cleanUrl}/embed/`;
-  }
-  return url;
-};
+import {
+  isEmbeddable,
+  getEmbedUrl,
+  isGoogleBooksPreview,
+  isInstagramReel,
+} from '@/app/components/helpers/bookHelpers';
 
 // ============================================================
 // COMPONENT STICKER & STATUS
@@ -461,19 +437,43 @@ export default function BookDetailPage({
 
               {book.previewurl && isEmbeddable(book.previewurl) ? (
                 <div
-                  className={`relative w-full rounded-3xl overflow-hidden shadow-lg border border-orange-100 bg-white ${book.previewurl.includes('instagram') ? 'h-[600px]' : 'aspect-video'
-                    }`}
+                  className={`relative w-full rounded-3xl overflow-hidden shadow-lg border border-orange-100 bg-white ${
+                    isGoogleBooksPreview(book.previewurl)
+                      ? 'h-[500px]'
+                      : book.previewurl.includes('instagram')
+                        ? 'h-[600px]'
+                        : 'aspect-video'
+                  }`}
                 >
                   <iframe
                     className="absolute inset-0 w-full h-full"
                     src={getEmbedUrl(book.previewurl) as string}
                     title={`Preview buku ${book.title}`}
                     loading="lazy"
-                    /* HAPUS ATRIBUT SANDBOX DI SINI, BIARKAN INSTAGRAM BERNAPAS */
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen
                   />
+                  {/* Label sumber preview */}
+                  {isGoogleBooksPreview(book.previewurl) && (
+                    <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full text-[10px] font-bold text-gray-500 shadow-sm border border-gray-100 flex items-center gap-1.5">
+                      <BookIcon className="w-3 h-3" /> Powered by Google Books
+                    </div>
+                  )}
                 </div>
+              ) : book.previewurl && isInstagramReel(book.previewurl) ? (
+                /* Instagram Reels — tidak bisa di-embed, tampilkan tombol external link */
+                <a
+                  href={book.previewurl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block bg-gradient-to-br from-purple-50 to-pink-50 rounded-3xl border border-purple-200 p-8 text-center hover:shadow-lg transition-all group h-[300px] flex flex-col items-center justify-center"
+                >
+                  <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg">
+                    <Eye className="w-8 h-8 text-white" />
+                  </div>
+                  <p className="font-black text-[#8B5E3C] text-lg mb-1">Lihat Preview di Instagram</p>
+                  <p className="text-sm text-gray-500">Klik untuk membuka Instagram Reels</p>
+                </a>
               ) : (
                 <div className="bg-orange-50/50 rounded-3xl border border-orange-100/50 p-12 text-center flex flex-col items-center justify-center text-gray-400 h-[300px]">
                   <Eye className="w-12 h-12 mb-4 text-orange-200" />

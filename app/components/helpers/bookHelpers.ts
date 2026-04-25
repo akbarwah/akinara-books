@@ -21,7 +21,9 @@ export const isEmbeddable = (url: string): boolean => {
     url.includes('youtube.com') ||
     url.includes('youtu.be') ||
     // Instagram post/carousel bisa di-embed, Reels tidak (blocked by X-Frame-Options)
-    isInstagramPost(url)
+    isInstagramPost(url) ||
+    // Google Books embedded preview
+    isGoogleBooksPreview(url)
   );
 };
 
@@ -35,6 +37,12 @@ export const isInstagramPost = (url: string): boolean => {
 export const isInstagramReel = (url: string): boolean => {
   if (!url || !url.includes('instagram.com')) return false;
   return url.includes('/reel/') || url.includes('/reels/');
+};
+
+// Google Books embedded preview — format: https://books.google.com/books?id=XXX&...&output=embed
+export const isGoogleBooksPreview = (url: string): boolean => {
+  if (!url) return false;
+  return url.includes('books.google.com/books') || url.includes('books.google.co');
 };
 
 export const getEmbedUrl = (url: string): string | null => {
@@ -57,6 +65,20 @@ export const getEmbedUrl = (url: string): string | null => {
     let cleanUrl = url.split('?')[0];
     if (cleanUrl.endsWith('/')) cleanUrl = cleanUrl.slice(0, -1);
     return `${cleanUrl}/embed`;
+  }
+  // Google Books — jika URL sudah format embed, gunakan langsung.
+  // Jika belum, tambahkan output=embed
+  if (isGoogleBooksPreview(url)) {
+    if (url.includes('output=embed')) {
+      return url.replace(/^http:/, 'https:');
+    }
+    // Construct embed URL dari URL biasa
+    const urlObj = new URL(url);
+    const bookId = urlObj.searchParams.get('id');
+    if (bookId) {
+      return `https://books.google.com/books?id=${bookId}&lpg=PP1&pg=PP1&output=embed`;
+    }
+    return url;
   }
   return url;
 };

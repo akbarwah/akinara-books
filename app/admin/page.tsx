@@ -15,7 +15,8 @@ import {
   Clock, Image as ImageIcon, Globe, LogOut,
   Layers, Baby, BookText, RefreshCcw,
   Download, Upload, Star, Loader2, Package,
-  Truck, Wallet, TrendingUp, ArrowRight
+  Truck, Wallet, TrendingUp, ArrowRight,
+  Sparkles, Wand2
 } from 'lucide-react';
 import { Sticker, Youtube } from 'lucide-react';
 import Link from 'next/link';
@@ -234,6 +235,16 @@ export default function AdminPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [importOverwrite, setImportOverwrite] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Google Books Auto-Fill State
+  const [isLookingUp, setIsLookingUp] = useState(false);
+  const [lookupResults, setLookupResults] = useState<{
+    title: string; author: string; publisher: string;
+    description: string; pages: string; image: string; language: string;
+    previewUrl: string;
+  }[]>([]);
+  const [showLookupDropdown, setShowLookupDropdown] = useState(false);
+  const lookupRef = useRef<HTMLDivElement>(null);
 
   // Order Summary State
   const [orderSummary, setOrderSummary] = useState<OrderSummary>(EMPTY_ORDER_SUMMARY);
@@ -489,7 +500,7 @@ export default function AdminPage() {
 
         const { data: existingBooks, error: fetchError } = await supabase
           .from('books')
-          .select('id, title, type');
+          .select('id, title, type, slug');
 
         if (fetchError) {
           setNotification({ type: 'error', text: 'Gagal mengambil data lama.' });
@@ -499,9 +510,18 @@ export default function AdminPage() {
 
         const dbMap = new Map<string, number>();
         existingBooks?.forEach((b) => {
+          if (b.slug) {
+            dbMap.set(b.slug, b.id);
+          }
           if (b.title) {
-            const key = `${b.title.trim().toLowerCase()}|${(b.type || 'board book').trim().toLowerCase()}`;
-            dbMap.set(key, b.id);
+            // Pemetaan cadangan berdasarkan title dan type
+            const fallbackKey = `${b.title.trim().toLowerCase()}|${(b.type || 'Board Book').trim().toLowerCase()}`;
+            dbMap.set(fallbackKey, b.id);
+            // Pemetaan slug alternatif jika tipe buku tidak dilampirkan dalam database sebelumnya
+            const fallbackSlug = generateSlug(b.title, b.type || 'Board Book');
+            dbMap.set(fallbackSlug, b.id);
+            const titleOnlySlug = generateSlug(b.title);
+            dbMap.set(titleOnlySlug, b.id);
           }
         });
 
@@ -509,13 +529,15 @@ export default function AdminPage() {
           const getVal = (key: string) => row[key] || '';
           const cleanTitle = (getVal('title') || 'Tanpa Judul').trim();
           const cleanType = (getVal('type') || 'Board Book').trim();
-          const key = `${cleanTitle.toLowerCase()}|${cleanType.toLowerCase()}`;
-          const existingId = dbMap.get(key);
+          const generatedSlug = generateSlug(cleanTitle, cleanType);
+          const fallbackKey = `${cleanTitle.toLowerCase()}|${cleanType.toLowerCase()}`;
+          
+          const existingId = dbMap.get(generatedSlug) || dbMap.get(fallbackKey) || dbMap.get(generateSlug(cleanTitle));
 
           return {
             id: existingId,
             title: cleanTitle,
-            slug: generateSlug(cleanTitle, cleanType),
+            slug: generatedSlug,
             price: row.price
               ? parseInt(String(row.price).replace(/[^0-9]/g, ''))
               : 0,
@@ -538,8 +560,7 @@ export default function AdminPage() {
         const uniqueMap = new Map();
         cleanData.forEach((item) => {
           if (item.title !== 'Tanpa Judul' && item.price > 0) {
-            const key = `${item.title.toLowerCase()}|${item.type.toLowerCase()}`;
-            uniqueMap.set(key, item);
+            uniqueMap.set(item.slug, item);
           }
         });
 
@@ -700,8 +721,72 @@ export default function AdminPage() {
   const openAddModal = useCallback(() => {
     setFormData(INITIAL_FORM);
     setIsEditing(false);
+    setLookupResults([]);
+    setShowLookupDropdown(false);
     setIsModalOpen(true);
   }, []);
+
+  // ============================================================
+  // GOOGLE BOOKS AUTO-FILL
+  // ============================================================
+  const handleBookLookup = useCallback(async () => {
+    const query = formData.title?.trim();
+    if (!query || query.length < 2) {
+      setNotification({ type: 'error', text: 'Ketik minimal 2 karakter judul untuk mencari.' });
+      return;
+    }
+
+    setIsLookingUp(true);
+    setLookupResults([]);
+    setShowLookupDropdown(false);
+
+    try {
+      const res = await fetch(`/api/books/lookup?q=${encodeURIComponent(query)}`);
+      const data = await res.json();
+
+      if (data.error) {
+        setNotification({ type: 'error', text: `Lookup gagal: ${data.error}` });
+      } else if (data.results?.length === 0) {
+        setNotification({ type: 'error', text: `Tidak ditemukan hasil untuk "${query}".` });
+      } else {
+        setLookupResults(data.results);
+        setShowLookupDropdown(true);
+      }
+    } catch (err) {
+      setNotification({ type: 'error', text: 'Gagal menghubungi Google Books API.' });
+    } finally {
+      setIsLookingUp(false);
+    }
+  }, [formData.title]);
+
+  const handleSelectLookupResult = useCallback((result: typeof lookupResults[0]) => {
+    setFormData((prev) => ({
+      ...prev,
+      title: result.title || prev.title,
+      author: result.author || prev.author,
+      publisher: result.publisher || prev.publisher,
+      description: result.description || prev.description,
+      pages: result.pages || prev.pages,
+      image: result.image || prev.image,
+      // Auto-fill preview URL dari Google Books jika tersedia dan field masih kosong
+      previewurl: result.previewUrl || prev.previewurl,
+    }));
+    setShowLookupDropdown(false);
+    const previewNote = result.previewUrl ? ' (termasuk preview buku 📖)' : '';
+    setNotification({ type: 'success', text: `Data "${result.title}" berhasil diisi otomatis!${previewNote}` });
+  }, []);
+
+  // Close lookup dropdown on outside click
+  useEffect(() => {
+    if (!showLookupDropdown) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (lookupRef.current && !lookupRef.current.contains(e.target as Node)) {
+        setShowLookupDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showLookupDropdown]);
 
   const handleHighlightChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const isTurningOn = e.target.checked;
@@ -1167,19 +1252,139 @@ export default function AdminPage() {
 
             {/* Modal Body */}
             <form onSubmit={handleSave} className="p-10 overflow-y-auto space-y-8">
+
+              {/* ✅ Google Books Auto-Fill Banner */}
+              <div className="bg-gradient-to-r from-violet-50 to-blue-50 border border-violet-200 rounded-2xl p-4 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-blue-500 flex items-center justify-center shrink-0">
+                  <Sparkles className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-black text-violet-800">Auto-Fill dari Google Books</p>
+                  <p className="text-xs text-violet-600">Ketik judul buku, lalu klik tombol <strong>Auto-Fill</strong> untuk mengisi otomatis cover, penulis, penerbit, deskripsi, dan halaman.</p>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
-                <div className="md:col-span-2">
+                <div className="md:col-span-2" ref={lookupRef}>
                   <label className="text-[10px] font-black text-[#8B5E3C] uppercase tracking-widest mb-2 flex items-center gap-2">
                     <Tag className="w-3 h-3" /> Judul Lengkap Buku *
                   </label>
-                  <input
-                    required
-                    type="text"
-                    value={formData.title || ''}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#FF9E9E] outline-none text-gray-900 font-bold text-lg"
-                  />
+                  <div className="relative">
+                    <div className="flex gap-2">
+                      <input
+                        required
+                        type="text"
+                        value={formData.title || ''}
+                        onChange={(e) => {
+                          setFormData({ ...formData, title: e.target.value });
+                          if (showLookupDropdown) setShowLookupDropdown(false);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleBookLookup();
+                          }
+                        }}
+                        placeholder="Ketik judul buku..."
+                        className="flex-1 px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-[#FF9E9E] outline-none text-gray-900 font-bold text-lg"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleBookLookup}
+                        disabled={isLookingUp || !formData.title?.trim()}
+                        className="px-5 py-4 bg-gradient-to-r from-violet-500 to-blue-500 hover:from-violet-600 hover:to-blue-600 text-white font-black rounded-2xl transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 shrink-0 shadow-md active:scale-95"
+                      >
+                        {isLookingUp ? (
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : (
+                          <Wand2 className="w-5 h-5" />
+                        )}
+                        {isLookingUp ? 'Mencari...' : 'Auto-Fill'}
+                      </button>
+                    </div>
+
+                    {/* Lookup Results Dropdown */}
+                    {showLookupDropdown && lookupResults.length > 0 && (
+                      <div className="absolute z-50 top-full mt-2 left-0 right-0 bg-white border-2 border-violet-200 rounded-2xl shadow-2xl max-h-[400px] overflow-y-auto">
+                        <div className="p-3 border-b border-gray-100 flex items-center justify-between">
+                          <span className="text-xs font-black text-violet-600 uppercase tracking-wider flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5" /> {lookupResults.length} Hasil Ditemukan
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setShowLookupDropdown(false)}
+                            className="text-gray-400 hover:text-gray-600 p-1"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                        {lookupResults.map((result, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => handleSelectLookupResult(result)}
+                            className="w-full text-left px-4 py-3 hover:bg-violet-50 transition-colors flex gap-4 items-start border-b border-gray-50 last:border-b-0 group"
+                          >
+                            {/* Thumbnail */}
+                            <div className="w-12 h-16 rounded-lg overflow-hidden bg-gray-100 shrink-0 shadow-sm">
+                              {result.image ? (
+                                <img
+                                  src={result.image}
+                                  alt={result.title}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-gray-300">
+                                  <ImageIcon className="w-5 h-5" />
+                                </div>
+                              )}
+                            </div>
+                            {/* Info */}
+                            <div className="flex-1 min-w-0">
+                              <p className="font-black text-gray-800 text-sm leading-tight group-hover:text-violet-700 transition-colors line-clamp-2">
+                                {result.title}
+                              </p>
+                              <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-[11px] text-gray-500">
+                                {result.author && (
+                                  <span className="flex items-center gap-1">
+                                    <User className="w-3 h-3" /> {result.author}
+                                  </span>
+                                )}
+                                {result.publisher && (
+                                  <span className="flex items-center gap-1">
+                                    <Building2 className="w-3 h-3" /> {result.publisher}
+                                  </span>
+                                )}
+                                {result.pages && (
+                                  <span className="flex items-center gap-1">
+                                    <BookText className="w-3 h-3" /> {result.pages}
+                                  </span>
+                                )}
+                              </div>
+                              {result.description && (
+                                <p className="text-[11px] text-gray-400 mt-1 line-clamp-2 leading-snug">
+                                  {result.description}
+                                </p>
+                              )}
+                              {result.previewUrl && (
+                                <span className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-200">
+                                  <BookOpenIcon className="w-3 h-3" /> Preview Tersedia
+                                </span>
+                              )}
+                            </div>
+                            {/* Select indicator */}
+                            <div className="shrink-0 self-center opacity-0 group-hover:opacity-100 transition-opacity">
+                              <div className="w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center">
+                                <CheckCircle className="w-4 h-4 text-violet-600" />
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div>
