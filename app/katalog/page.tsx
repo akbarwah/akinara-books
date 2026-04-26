@@ -39,7 +39,7 @@ export default async function KatalogPage() {
   // ✅ OPTIMIZED: hanya ambil field yang dibutuhkan (tanpa desc/previewurl) untuk hemat transfer
   const { data, error } = await supabase
     .from('books')
-    .select('id, title, price, image, status, type, weight, author, publisher, category, age, pages, eta, sticker_text, is_highlight, slug, original_price');
+    .select('id, title, price, image, status, type, author, publisher, category, age, pages, eta, sticker_text, is_highlight, slug, original_price');
 
   if (error) {
     console.error('Error fetching books in KatalogPage:', error);
