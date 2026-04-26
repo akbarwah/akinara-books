@@ -1,5 +1,8 @@
 import { supabase } from '../supabaseClient';
 
+// ✅ Sitemap hanya perlu di-regenerate 1x sehari
+export const revalidate = 86400;
+
 export default async function sitemap() {
   // Fetch all book slugs
   const { data: books } = await supabase

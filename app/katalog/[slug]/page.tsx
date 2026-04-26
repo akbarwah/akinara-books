@@ -6,9 +6,10 @@ import type { Book } from '@/app/types/book';
 
 // ==================== CACHING ====================
 
-// ✅ ISR: cache halaman 60 detik, lalu revalidate di background
-// Ini JAUH lebih cepat dari force-dynamic (setiap request query DB)
-export const revalidate = 60;
+// ✅ ISR: cache halaman 4 jam, lalu revalidate di background
+// revalidate=60 sebelumnya menyebabkan 535K ISR writes/hari (limit free: 200K/bulan!)
+// Dengan 14400 (4 jam): ~2.2K writes/hari = ~66K/bulan → aman di free tier
+export const revalidate = 14400;
 
 // ==================== TYPES ====================
 
@@ -54,7 +55,7 @@ async function getRelatedBooks(currentBook: Book): Promise<Book[]> {
 
     const { data } = await supabase
         .from('books')
-        .select('*')
+        .select('id, title, price, image, status, type, author, publisher, category, age, slug, sticker_text')
         .neq('id', currentBook.id)
         .or(filters)
         .limit(50);

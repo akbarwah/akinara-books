@@ -4,9 +4,9 @@ import KatalogClient from './KatalogClient';
 import type { Book } from '@/app/types/book';
 import { STATUS_PRIORITY } from '../components/helpers/bookHelpers';
 
-// ✅ ISR: cache halaman 60 detik, lalu revalidate di background
-// Sebelumnya force-dynamic = setiap request query DB = lambat 3-6 detik
-export const revalidate = 60;
+// ✅ ISR: cache halaman 1 jam, lalu revalidate di background
+// revalidate=60 sebelumnya terlalu agresif, menyebabkan ISR writes berlebihan
+export const revalidate = 3600;
 
 // ✅ Helper: konversi status ke schema availability
 function getAvailability(status: string): string {
@@ -35,8 +35,11 @@ function groupBooks(books: Book[]): { title: string; books: Book[] }[] {
 }
 
 export default async function KatalogPage() {
-  // ✅ Fetch di server — ISR (revalidate=60) memastikan ini di-cache, bukan query setiap request
-  const { data, error } = await supabase.from('books').select('*');
+  // ✅ Fetch di server — ISR (revalidate=3600) memastikan ini di-cache
+  // ✅ OPTIMIZED: hanya ambil field yang dibutuhkan (tanpa desc/previewurl) untuk hemat transfer
+  const { data, error } = await supabase
+    .from('books')
+    .select('id, title, price, image, status, type, weight, author, publisher, category, age, pages, eta, sticker_text, is_highlight, slug, original_price');
 
   if (error) {
     console.error('Error fetching books in KatalogPage:', error);

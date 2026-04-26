@@ -84,10 +84,22 @@ export async function GET(request: NextRequest) {
     });
 
     if (!response.ok) {
-      console.error('Google Books API error:', response.status, response.statusText);
+      const errorData = await response.json().catch(() => ({}));
+      const statusCode = response.status;
+      let errorMessage = 'Failed to fetch from Google Books API.';
+
+      if (statusCode === 429) {
+        errorMessage = 'Limit pencarian harian Google Books telah habis. Silakan coba lagi besok.';
+      } else if (statusCode === 403) {
+        errorMessage = 'Akses ke Google Books API ditolak (Quota Exceeded / Forbidden).';
+      } else if (errorData?.error?.message) {
+        errorMessage = errorData.error.message;
+      }
+
+      console.error(`Google Books API error (${statusCode}):`, errorMessage);
       return NextResponse.json(
-        { error: 'Failed to fetch from Google Books API.' },
-        { status: 502 }
+        { error: errorMessage },
+        { status: statusCode }
       );
     }
 
