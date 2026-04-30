@@ -73,10 +73,13 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Google Books API — free tier, no key required for basic searches
+    // Gunakan API Key dari environment variable jika tersedia, agar tidak terkena limit ketat IP public
+    const apiKey = process.env.GOOGLE_BOOKS_API_KEY;
+    const apiKeyParam = apiKey ? `&key=${apiKey}` : '';
+
     const apiUrl = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(
       query
-    )}&maxResults=8&printType=books&langRestrict=en&orderBy=relevance`;
+    )}&maxResults=8&printType=books&langRestrict=en&orderBy=relevance${apiKeyParam}`;
 
     const response = await fetch(apiUrl, {
       headers: { 'Accept': 'application/json' },
