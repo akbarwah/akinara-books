@@ -311,13 +311,31 @@ export default function BookDetailClient({
                                     <span className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">
                                         <User className="w-3 h-3" /> Penulis
                                     </span>
-                                    <span className="font-medium text-[#6D4C41]">{activeVariant.author || '-'}</span>
+                                    {activeVariant.author ? (
+                                        <Link
+                                            href={`/katalog?author=${encodeURIComponent(activeVariant.author)}`}
+                                            className="font-medium text-[#8B5E3C] hover:text-[#FF9E9E] underline underline-offset-2 decoration-orange-200 hover:decoration-[#FF9E9E] transition-colors"
+                                        >
+                                            {activeVariant.author}
+                                        </Link>
+                                    ) : (
+                                        <span className="font-medium text-[#6D4C41]">-</span>
+                                    )}
                                 </div>
                                 <div className="flex flex-col gap-1">
                                     <span className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">
                                         <Building2 className="w-3 h-3" /> Penerbit
                                     </span>
-                                    <span className="font-medium text-[#6D4C41]">{activeVariant.publisher || '-'}</span>
+                                    {activeVariant.publisher ? (
+                                        <Link
+                                            href={`/katalog?publisher=${encodeURIComponent(activeVariant.publisher)}`}
+                                            className="font-medium text-[#8B5E3C] hover:text-[#FF9E9E] underline underline-offset-2 decoration-orange-200 hover:decoration-[#FF9E9E] transition-colors"
+                                        >
+                                            {activeVariant.publisher}
+                                        </Link>
+                                    ) : (
+                                        <span className="font-medium text-[#6D4C41]">-</span>
+                                    )}
                                 </div>
                                 <div className="flex flex-col gap-1">
                                     <span className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">

@@ -380,17 +380,32 @@ function KatalogContent({ initialBooks }: { initialBooks: Book[] }) {
   const [books] = useState<Book[]>(initialBooks); // ✅ Tidak perlu fetch lagi
   const [selectedGroup, setSelectedGroup] = useState<BookGroup | null>(null);
 
-  // ✅ Restore filter terakhir dari sessionStorage
-  const savedFilters = typeof window !== 'undefined'
-    ? JSON.parse(sessionStorage.getItem('katalog_filters') || 'null')
-    : null;
+  // ✅ Inisialisasi filter dengan default dulu (cocok dengan server render)
+  // Lalu restore dari sessionStorage setelah hydration selesai (di useEffect)
+  const [filterSearch, setFilterSearch] = useState('');
+  const [filterStatus, setFilterStatus] = useState('Semua');
+  const [filterCategory, setFilterCategory] = useState('Semua');
+  const [filterAge, setFilterAge] = useState('Semua');
+  const [filterType, setFilterType] = useState('Semua');
+  const [filterPublisher, setFilterPublisher] = useState('Semua');
 
-  const [filterSearch, setFilterSearch] = useState(savedFilters?.search || '');
-  const [filterStatus, setFilterStatus] = useState(savedFilters?.status || 'Semua');
-  const [filterCategory, setFilterCategory] = useState(savedFilters?.category || 'Semua');
-  const [filterAge, setFilterAge] = useState(savedFilters?.age || 'Semua');
-  const [filterType, setFilterType] = useState(savedFilters?.type || 'Semua');
-  const [filterPublisher, setFilterPublisher] = useState(savedFilters?.publisher || 'Semua');
+  // ✅ Restore filter terakhir dari sessionStorage SETELAH hydration
+  const [hydrated, setHydrated] = useState(false);
+  React.useEffect(() => {
+    const saved = sessionStorage.getItem('katalog_filters');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed.search) setFilterSearch(parsed.search);
+        if (parsed.status && parsed.status !== 'Semua') setFilterStatus(parsed.status);
+        if (parsed.category && parsed.category !== 'Semua') setFilterCategory(parsed.category);
+        if (parsed.age && parsed.age !== 'Semua') setFilterAge(parsed.age);
+        if (parsed.type && parsed.type !== 'Semua') setFilterType(parsed.type);
+        if (parsed.publisher && parsed.publisher !== 'Semua') setFilterPublisher(parsed.publisher);
+      } catch {}
+    }
+    setHydrated(true);
+  }, []);
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -405,6 +420,14 @@ function KatalogContent({ initialBooks }: { initialBooks: Book[] }) {
       setFilterPublisher(publisherParam);
     }
   }, [publisherParam]);
+
+  // ✅ Author param dari book detail hyperlink
+  const authorParam = searchParams.get('author');
+  React.useEffect(() => {
+    if (authorParam) {
+      setFilterSearch(authorParam);
+    }
+  }, [authorParam]);
 
   // ✅ Simpan filter ke sessionStorage setiap kali berubah
   React.useEffect(() => {
